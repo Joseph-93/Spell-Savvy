@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+
+{% block title %}Game Configuration - Spelling Game{% endblock %}
+
+{% block content %}
+<div class="config-container">
+    <h2>⚙️ Game Configuration</h2>
+    
+    <p>Configure the game parameters for your students.</p>
+    
+    <form method="post" class="config-form">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="default_starting_bucket">Default Starting Bucket (Word Length):</label>
+            <select 
+                id="default_starting_bucket" 
+                name="default_starting_bucket" 
+                required
+            >
+                {% for bucket in available_buckets %}
+                    <option value="{{ bucket }}" {% if bucket == config.default_starting_bucket %}selected{% endif %}>
+                        {{ bucket }} letters
+                    </option>
+                {% endfor %}
+            </select>
+            <p class="help-text">
+                <strong>⚡ Changes take effect immediately!</strong><br>
+                {% if students_using_default > 0 %}
+                    Currently <strong>{{ students_using_default }} student(s)</strong> are using this default setting and will be moved to the new difficulty instantly.
+                {% else %}
+                    All your students have custom settings, so changing this will only affect new students.
+                {% endif %}
+            </p>
+        </div>
+        
+        <div class="form-group">
+            <label for="words_to_complete_bucket">Words to Complete Each Bucket:</label>
+            <input 
+                type="number" 
+                id="words_to_complete_bucket" 
+                name="words_to_complete_bucket" 
+                value="{{ config.words_to_complete_bucket }}"
+                min="1"
+                required
+            >
+            <p class="help-text">Number of words a student must master before moving to the next difficulty level.</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="recycling_distance">Recycling Distance:</label>
+            <input 
+                type="number" 
+                id="recycling_distance" 
+                name="recycling_distance" 
+                value="{{ config.recycling_distance }}"
+                min="1"
+                required
+            >
+            <p class="help-text">When a student gets a word wrong, it will reappear within this many words.</p>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Save Configuration</button>
+    </form>
+    
+    <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary">← Back to Dashboard</a>
+</div>
+
+<style>
+    .config-container {
+        max-width: 600px;
+        margin: 2rem auto;
+    }
+    
+    .config-form {
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .form-group input {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+    }
+    
+    .form-group select {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+    }
+    
+    .help-text {
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+        color: #666;
+    }
+    
+    .btn-primary {
+        background: #4CAF50;
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+    }
+    
+    .btn-primary:hover {
+        background: #45a049;
+    }
+    
+    .btn-secondary {
+        display: inline-block;
+        background: #666;
+        color: white;
+        text-decoration: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 4px;
+        margin-top: 1rem;
+    }
+    
+    .btn-secondary:hover {
+        background: #555;
+    }
+</style>
+{% endblock %}

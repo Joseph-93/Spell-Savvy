@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Spell Savvy{% endblock %}</title>
+    {% load static %}
+    <link rel="icon" type="image/png" href="{% static 'images/Spell-Savvy.png' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="{% url 'home' %}" class="logo-link">
+                    <img src="{% static 'images/Spell-Savvy.png' %}" alt="Spell Savvy Logo" class="logo-image">
+                    <span class="brand-text">Spell Savvy</span>
+                </a>
+            </div>
+            <div class="nav-menu">
+                {% if user.is_authenticated %}
+                    <span class="nav-user">👤 {{ user.username }} ({{ user.role }})</span>
+                    {% if user.is_teacher %}
+                        <a href="{% url 'teacher_dashboard' %}" class="nav-link">Dashboard</a>
+                        <a href="{% url 'teacher_config' %}" class="nav-link">Settings</a>
+                    {% else %}
+                        <a href="{% url 'student_dashboard' %}" class="nav-link">Dashboard</a>
+                        <a href="{% url 'student_game' %}" class="nav-link">Play</a>
+                    {% endif %}
+                    <a href="{% url 'logout' %}" class="nav-link">Logout</a>
+                {% else %}
+                    <a href="{% url 'login' %}" class="nav-link">Login</a>
+                    <a href="{% url 'register' %}" class="nav-link">Register</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

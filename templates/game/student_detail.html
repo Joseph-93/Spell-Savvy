@@ -1,0 +1,282 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ student.username }} - Student Detail{% endblock %}
+
+{% block content %}
+<div class="student-detail">
+    <h2>📈 Student Performance: {{ student.username }}</h2>
+    
+    <div class="stats-grid">
+        <div class="stat-box">
+            <h3>Current Bucket</h3>
+            <p class="big-stat">{{ progress.current_bucket|default:"N/A" }}</p>
+        </div>
+        <div class="stat-box">
+            <h3>Total Words Correct</h3>
+            <p class="big-stat">{{ progress.total_words_correct|default:0 }}</p>
+        </div>
+        <div class="stat-box">
+            <h3>Total Attempts</h3>
+            <p class="big-stat">{{ progress.total_attempts|default:0 }}</p>
+        </div>
+    </div>
+    
+    <div class="config-section">
+        <h3>⚙️ Student Settings</h3>
+        <form method="post" action="{% url 'update_student_starting_bucket' student.id %}" class="inline-form">
+            {% csrf_token %}
+            <div class="form-inline-group">
+                <label for="custom_starting_bucket">Set Word Difficulty (Letters):</label>
+                <select id="custom_starting_bucket" name="custom_starting_bucket">
+                    <option value="">Use Teacher Default ({{ config.default_starting_bucket }})</option>
+                    {% for bucket in available_buckets %}
+                        <option value="{{ bucket }}" {% if progress.custom_starting_bucket == bucket %}selected{% endif %}>
+                            {{ bucket }} letters
+                        </option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-small">Update Now</button>
+            </div>
+            <p class="help-text">
+                <strong>Current difficulty:</strong> {{ progress.current_bucket }}-letter words
+                {% if progress.custom_starting_bucket %}
+                    (custom override)
+                {% else %}
+                    (teacher default)
+                {% endif %}
+                <br>
+                <em>⚡ Changes take effect immediately - the student will get new words at the selected difficulty!</em>
+            </p>
+        </form>
+    </div>
+    
+    <h3>📚 Bucket Progress</h3>
+    {% if bucket_progress %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Bucket</th>
+                    <th>Words Mastered</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for bp in bucket_progress %}
+                <tr>
+                    <td>Bucket {{ bp.bucket }}</td>
+                    <td>{{ bp.words_mastered }}</td>
+                    <td>
+                        {% if bp.is_completed %}
+                            ✅ Completed
+                        {% else %}
+                            🔄 In Progress
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No bucket progress yet.</p>
+    {% endif %}
+    
+    <h3>🎮 Recent Sessions</h3>
+    {% if sessions %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Words Correct</th>
+                    <th>Words Attempted</th>
+                    <th>Accuracy</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for session in sessions %}
+                <tr>
+                    <td>{{ session.started_at|date:"M d, Y H:i" }}</td>
+                    <td>{{ session.words_correct }}</td>
+                    <td>{{ session.words_attempted }}</td>
+                    <td>{{ session.accuracy|floatformat:1 }}%</td>
+                    <td>
+                        {% if session.is_active %}
+                            🟢 Active
+                        {% else %}
+                            ⚫ Ended
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No sessions yet.</p>
+    {% endif %}
+    
+    <h3>📝 Word Performance</h3>
+    {% if word_performance %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Word</th>
+                    <th>Bucket</th>
+                    <th>Total Attempts</th>
+                    <th>Correct Attempts</th>
+                    <th>Accuracy</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for perf in word_performance %}
+                <tr>
+                    <td>{{ perf.word__text }}</td>
+                    <td>{{ perf.word__difficulty_bucket }}</td>
+                    <td>{{ perf.total_attempts }}</td>
+                    <td>{{ perf.correct_attempts }}</td>
+                    <td>
+                        {% if perf.accuracy >= 75 %}
+                            <span style="color: green;">{{ perf.accuracy|floatformat:0 }}%</span>
+                        {% elif perf.accuracy >= 50 %}
+                            <span style="color: orange;">{{ perf.accuracy|floatformat:0 }}%</span>
+                        {% else %}
+                            <span style="color: red;">{{ perf.accuracy|floatformat:0 }}%</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No word attempts yet.</p>
+    {% endif %}
+    
+    <a href="{% url 'teacher_dashboard' %}" class="btn">← Back to Dashboard</a>
+</div>
+
+<style>
+    .student-detail {
+        max-width: 1200px;
+        margin: 2rem auto;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin: 2rem 0;
+    }
+    
+    .stat-box {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stat-box h3 {
+        margin: 0 0 1rem 0;
+        color: #666;
+        font-size: 1rem;
+    }
+    
+    .big-stat {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #4CAF50;
+        margin: 0;
+    }
+    
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+    
+    .data-table th {
+        background: #4CAF50;
+        color: white;
+        padding: 1rem;
+        text-align: left;
+    }
+    
+    .data-table td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .data-table tr:hover {
+        background: #f5f5f5;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        background: #2196F3;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        margin-top: 1rem;
+    }
+    
+    .btn:hover {
+        background: #0b7dda;
+    }
+    
+    .btn-small {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+    
+    .btn-small:hover {
+        background: #45a049;
+    }
+    
+    .config-section {
+        background: #fff;
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .inline-form {
+        margin-top: 1rem;
+    }
+    
+    .form-inline-group {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-inline-group label {
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .form-inline-group select {
+        padding: 0.5rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+    }
+    
+    .help-text {
+        font-size: 0.9rem;
+        color: #666;
+        margin-top: 0.5rem;
+    }
+</style>
+{% endblock %}

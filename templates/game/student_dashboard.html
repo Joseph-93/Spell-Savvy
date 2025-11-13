@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+
+{% block title %}My Progress - Spelling Game{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-container {
+        max-width: 1200px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+    
+    .welcome-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding: 2rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .welcome-header h1 {
+        margin-bottom: 0.5rem;
+        font-size: 2.5rem;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        text-align: center;
+        transition: transform 0.2s;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .stat-icon {
+        font-size: 3rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-label {
+        font-size: 1rem;
+        color: #666;
+    }
+    
+    .play-button-container {
+        text-align: center;
+        margin: 3rem 0;
+    }
+    
+    .btn-play {
+        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        color: white;
+        border: none;
+        padding: 1.5rem 4rem;
+        font-size: 1.5rem;
+        font-weight: bold;
+        border-radius: 50px;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        transition: all 0.3s;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-play:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(76, 175, 80, 0.5);
+    }
+    
+    .sessions-section {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .sessions-section h2 {
+        margin-bottom: 1.5rem;
+        color: #333;
+    }
+    
+    .session-list {
+        list-style: none;
+        padding: 0;
+    }
+    
+    .session-item {
+        padding: 1rem;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .session-item:last-child {
+        border-bottom: none;
+    }
+    
+    .session-date {
+        font-weight: bold;
+        color: #666;
+    }
+    
+    .session-score {
+        font-size: 1.2rem;
+    }
+    
+    .session-score.good {
+        color: #4CAF50;
+    }
+    
+    .session-score.ok {
+        color: #FF9800;
+    }
+    
+    .session-score.needs-work {
+        color: #f44336;
+    }
+    
+    .no-sessions {
+        text-align: center;
+        padding: 2rem;
+        color: #999;
+        font-style: italic;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="welcome-header">
+        <h1>👋 Welcome back, {{ request.user.username }}!</h1>
+        <p>Keep up the great work on your spelling journey!</p>
+    </div>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">📚</div>
+            <div class="stat-value">{{ progress.current_bucket }}</div>
+            <div class="stat-label">Current Bucket</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">✅</div>
+            <div class="stat-value">{{ progress.total_words_correct }}</div>
+            <div class="stat-label">Total Words Mastered</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">🎯</div>
+            <div class="stat-value">{{ accuracy }}%</div>
+            <div class="stat-label">Overall Accuracy</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">🎮</div>
+            <div class="stat-value">{{ total_sessions }}</div>
+            <div class="stat-label">Sessions Played</div>
+        </div>
+    </div>
+    
+    <div class="play-button-container">
+        <a href="{% url 'student_game' %}" class="btn-play">
+            🎮 Start Playing
+        </a>
+    </div>
+    
+    <div class="sessions-section">
+        <h2>📊 Recent Sessions</h2>
+        {% if recent_sessions %}
+            <ul class="session-list">
+                {% for session in recent_sessions %}
+                <li class="session-item">
+                    <span class="session-date">
+                        {{ session.started_at|date:"M d, Y - g:i A" }}
+                    </span>
+                    <span class="session-score {% if session.accuracy >= 80 %}good{% elif session.accuracy >= 60 %}ok{% else %}needs-work{% endif %}">
+                        {{ session.words_correct }} / {{ session.words_attempted }} 
+                        ({{ session.accuracy|floatformat:0 }}%)
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="no-sessions">
+                No sessions yet. Click "Start Playing" to begin!
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
