@@ -8,7 +8,7 @@ from django.db.models import Count, Q, Avg
 from django.utils import timezone
 from .models import (
     Word, GameSession, WordAttempt, StudentProgress,
-    BucketProgress, WordQueue, GameConfiguration
+    BucketProgress, WordQueue, GameConfiguration, Classroom
 )
 from accounts.models import User
 import random
@@ -54,11 +54,17 @@ def student_dashboard(request):
     # Count total sessions
     total_sessions = GameSession.objects.filter(student=request.user).count()
     
+    # Get leaderboard data for current student's classroom
+    leaderboard_data = None
+    if request.user.classroom:
+        leaderboard_data = get_classroom_leaderboard(request.user.classroom, request.user)
+    
     context = {
         'progress': progress,
         'recent_sessions': recent_sessions,
         'accuracy': round(accuracy, 1),
         'total_sessions': total_sessions,
+        'leaderboard_data': leaderboard_data,
     }
     
     return render(request, 'game/student_dashboard.html', context)
@@ -130,9 +136,10 @@ def student_game(request):
     )
     
     # Get game configuration from student's teacher or use default
-    if request.user.teacher:
+    teacher = request.user.get_teacher()
+    if teacher:
         config, _ = GameConfiguration.objects.get_or_create(
-            teacher=request.user.teacher,
+            teacher=teacher,
             defaults={
                 'default_starting_bucket': 3,
                 'words_to_complete_bucket': 200,
@@ -150,11 +157,17 @@ def student_game(request):
             }
         )
     
+    # Get leaderboard data for current student's classroom
+    leaderboard_data = None
+    if request.user.classroom:
+        leaderboard_data = get_classroom_leaderboard(request.user.classroom, request.user)
+    
     context = {
         'progress': progress,
         'session': active_session,
         'bucket_progress': bucket_progress,
         'config': config,
+        'leaderboard_data': leaderboard_data,
     }
     
     return render(request, 'game/student_game.html', context)
@@ -339,6 +352,11 @@ def submit_answer(request):
                 
                 if not next_bucket_has_words:
                     # Game complete!
+                    leaderboard_data = None
+                    if request.user.classroom:
+                        raw_leaderboard = get_classroom_leaderboard(request.user.classroom, request.user)
+                        leaderboard_data = serialize_leaderboard_for_json(raw_leaderboard)
+                    
                     return JsonResponse({
                         'correct': True,
                         'game_complete': True,
@@ -347,12 +365,18 @@ def submit_answer(request):
                         'session_correct': session.words_correct,
                         'session_attempted': session.words_attempted,
                         'total_correct': progress.total_words_correct,
-                        'message': f'Congratulations! You have mastered all available buckets up to {word.difficulty_bucket}-letter words!'
+                        'message': f'Congratulations! You have mastered all available buckets up to {word.difficulty_bucket}-letter words!',
+                        'leaderboard': leaderboard_data
                     })
                 
                 # Move to next bucket
                 progress.current_bucket = next_bucket
                 progress.save()
+                
+                leaderboard_data = None
+                if request.user.classroom:
+                    raw_leaderboard = get_classroom_leaderboard(request.user.classroom, request.user)
+                    leaderboard_data = serialize_leaderboard_for_json(raw_leaderboard)
                 
                 return JsonResponse({
                     'correct': True,
@@ -361,7 +385,8 @@ def submit_answer(request):
                     'new_bucket': progress.current_bucket,
                     'session_correct': session.words_correct,
                     'session_attempted': session.words_attempted,
-                    'total_correct': progress.total_words_correct
+                    'total_correct': progress.total_words_correct,
+                    'leaderboard': leaderboard_data
                 })
             
             bucket_progress.save()
@@ -391,15 +416,24 @@ def submit_answer(request):
         bucket=progress.current_bucket
     )
     
-    return JsonResponse({
+    # Get updated leaderboard data
+    leaderboard_data = None
+    if request.user.classroom:
+        raw_leaderboard = get_classroom_leaderboard(request.user.classroom, request.user)
+        leaderboard_data = serialize_leaderboard_for_json(raw_leaderboard)
+    
+    response_data = {
         'correct': is_correct,
         'correct_spelling': word.text,
         'bucket_complete': False,
         'words_mastered': bucket_progress.words_mastered,
         'session_correct': session.words_correct,
         'session_attempted': session.words_attempted,
-        'total_correct': progress.total_words_correct
-    })
+        'total_correct': progress.total_words_correct,
+        'leaderboard': leaderboard_data
+    }
+    
+    return JsonResponse(response_data)
 
 
 @login_required
@@ -430,11 +464,12 @@ def teacher_dashboard(request):
     if not request.user.is_teacher():
         return redirect('student_game')
     
-    # Get only THIS teacher's students
+    # Get students - support both classroom and legacy teacher assignment
     students = User.objects.filter(
-        role='student',
-        teacher=request.user
-    ).select_related('progress')
+        role='student'
+    ).filter(
+        Q(classroom__teacher=request.user) | Q(teacher=request.user)
+    ).select_related('progress').distinct()
     
     # Get statistics for each student
     student_stats = []
@@ -707,3 +742,273 @@ def update_student_starting_bucket(request, student_id):
             messages.error(request, 'Please enter a valid number')
     
     return redirect('student_detail', student_id=student_id)
+
+
+@login_required
+def classroom_list(request):
+    """View and manage all classrooms for a teacher"""
+    if not request.user.is_teacher():
+        return redirect('student_game')
+    
+    classrooms = Classroom.objects.filter(teacher=request.user).order_by('name')
+    
+    context = {
+        'classrooms': classrooms,
+    }
+    
+    return render(request, 'game/classroom_list.html', context)
+
+
+@login_required
+def classroom_create(request):
+    """Create a new classroom"""
+    if not request.user.is_teacher():
+        return redirect('student_game')
+    
+    if request.method == 'POST':
+        classroom_name = request.POST.get('classroom_name', '').strip()
+        
+        if not classroom_name:
+            messages.error(request, 'Please enter a classroom name')
+        elif Classroom.objects.filter(teacher=request.user, name=classroom_name).exists():
+            messages.error(request, f'You already have a classroom named "{classroom_name}"')
+        else:
+            classroom = Classroom.objects.create(
+                name=classroom_name,
+                teacher=request.user
+            )
+            messages.success(request, f'✅ Classroom "{classroom_name}" created! Join code: {classroom.join_code}')
+            return redirect('classroom_detail', classroom_id=classroom.id)
+    
+    return redirect('classroom_list')
+
+
+@login_required
+def classroom_detail(request, classroom_id):
+    """View details of a specific classroom"""
+    if not request.user.is_teacher():
+        return redirect('student_game')
+    
+    try:
+        classroom = Classroom.objects.get(id=classroom_id, teacher=request.user)
+    except Classroom.DoesNotExist:
+        messages.error(request, 'Classroom not found')
+        return redirect('classroom_list')
+    
+    # Get students in this classroom
+    students = User.objects.filter(
+        role='student',
+        classroom=classroom
+    ).select_related('progress')
+    
+    # Get statistics for each student
+    student_stats = []
+    for student in students:
+        progress = getattr(student, 'progress', None)
+        
+        # Get recent sessions
+        recent_sessions = GameSession.objects.filter(
+            student=student
+        ).order_by('-started_at')[:5]
+        
+        # Calculate overall accuracy
+        total_attempts = WordAttempt.objects.filter(student=student).count()
+        correct_attempts = WordAttempt.objects.filter(
+            student=student,
+            is_correct=True
+        ).count()
+        
+        accuracy = (correct_attempts / total_attempts * 100) if total_attempts > 0 else 0
+        
+        student_stats.append({
+            'student': student,
+            'progress': progress,
+            'recent_sessions': recent_sessions,
+            'total_attempts': total_attempts,
+            'correct_attempts': correct_attempts,
+            'accuracy': accuracy
+        })
+    
+    # Generate full join URL for easy copying
+    join_url = request.build_absolute_uri(classroom.get_join_url())
+    
+    context = {
+        'classroom': classroom,
+        'student_stats': student_stats,
+        'join_url': join_url,
+    }
+    
+    return render(request, 'game/classroom_detail.html', context)
+
+
+@login_required
+def classroom_delete(request, classroom_id):
+    """Delete a classroom"""
+    if not request.user.is_teacher():
+        return redirect('student_game')
+    
+    if request.method == 'POST':
+        try:
+            classroom = Classroom.objects.get(id=classroom_id, teacher=request.user)
+            classroom_name = classroom.name
+            
+            # Remove students from this classroom (don't delete them)
+            User.objects.filter(classroom=classroom).update(classroom=None)
+            
+            classroom.delete()
+            messages.success(request, f'Classroom "{classroom_name}" deleted')
+        except Classroom.DoesNotExist:
+            messages.error(request, 'Classroom not found')
+    
+    return redirect('classroom_list')
+
+
+@login_required
+def classroom_regenerate_code(request, classroom_id):
+    """Regenerate the join code for a classroom"""
+    if not request.user.is_teacher():
+        return redirect('student_game')
+    
+    if request.method == 'POST':
+        try:
+            classroom = Classroom.objects.get(id=classroom_id, teacher=request.user)
+            old_code = classroom.join_code
+            classroom.join_code = Classroom.generate_join_code()
+            classroom.save()
+            messages.success(request, f'✅ New join code generated: {classroom.join_code}')
+        except Classroom.DoesNotExist:
+            messages.error(request, 'Classroom not found')
+    
+    return redirect('classroom_detail', classroom_id=classroom_id)
+
+
+def get_classroom_leaderboard(classroom, current_student):
+    """
+    Calculate leaderboard for a classroom
+    Returns dict with top 5 students and current student's ranking
+    """
+    # Get all students in the classroom with their progress
+    students = User.objects.filter(
+        role='student',
+        classroom=classroom
+    ).select_related('progress')
+    
+    # Build leaderboard data
+    leaderboard = []
+    for student in students:
+        progress = getattr(student, 'progress', None)
+        if progress:
+            leaderboard.append({
+                'student': student,
+                'progress': progress,
+                'score': progress.score,
+                'accuracy': progress.accuracy,
+            })
+    
+    # Sort by score (descending)
+    leaderboard.sort(key=lambda x: x['score'], reverse=True)
+    
+    # Add rankings
+    for i, entry in enumerate(leaderboard):
+        entry['rank'] = i + 1
+    
+    # Find current student's ranking
+    current_student_data = None
+    current_student_index = None
+    for i, entry in enumerate(leaderboard):
+        if entry['student'].id == current_student.id:
+            current_student_data = entry
+            current_student_index = i
+            break
+    
+    # Calculate gap to next person
+    gap_to_next = 0
+    next_student_data = None
+    if current_student_index is not None and current_student_index > 0:
+        next_student_data = leaderboard[current_student_index - 1]
+        gap_to_next = next_student_data['score'] - current_student_data['score']
+    
+    return {
+        'top_5': leaderboard[:5],
+        'current_student': current_student_data,
+        'gap_to_next': gap_to_next,
+        'next_student': next_student_data,
+        'total_students': len(leaderboard)
+    }
+
+
+def serialize_leaderboard_for_json(leaderboard_data):
+    """
+    Convert leaderboard data to JSON-serializable format
+    """
+    if not leaderboard_data:
+        return None
+    
+    def serialize_student_entry(entry):
+        if not entry:
+            return None
+        return {
+            'rank': entry['rank'],
+            'username': entry['student'].username,
+            'score': entry['score'],
+            'accuracy': round(entry['accuracy'], 1),
+            'bucket': entry['progress'].current_bucket,
+            'words_correct': entry['progress'].total_words_correct,
+            'is_current': False,  # Will be set later
+        }
+    
+    # Serialize top 5
+    top_5_serialized = []
+    for entry in leaderboard_data['top_5']:
+        serialized = serialize_student_entry(entry)
+        if serialized:
+            top_5_serialized.append(serialized)
+    
+    # Mark current student in top 5
+    current_student_serialized = None
+    if leaderboard_data['current_student']:
+        current_student_serialized = serialize_student_entry(leaderboard_data['current_student'])
+        if current_student_serialized:
+            current_student_serialized['is_current'] = True
+            
+            # Mark in top 5 if present
+            for entry in top_5_serialized:
+                if entry['rank'] == current_student_serialized['rank']:
+                    entry['is_current'] = True
+    
+    # Serialize next student
+    next_student_serialized = None
+    if leaderboard_data['next_student']:
+        next_student_serialized = {
+            'username': leaderboard_data['next_student']['student'].username,
+            'score': leaderboard_data['next_student']['score'],
+        }
+    
+    return {
+        'top_5': top_5_serialized,
+        'current_student': current_student_serialized,
+        'gap_to_next': leaderboard_data['gap_to_next'],
+        'next_student': next_student_serialized,
+        'total_students': leaderboard_data['total_students']
+    }
+
+
+@login_required
+def classroom_leaderboard(request):
+    """Full leaderboard page for students"""
+    if request.user.is_teacher():
+        return redirect('teacher_dashboard')
+    
+    if not request.user.classroom:
+        messages.warning(request, 'You are not in a classroom yet.')
+        return redirect('student_dashboard')
+    
+    leaderboard_data = get_classroom_leaderboard(request.user.classroom, request.user)
+    
+    context = {
+        'classroom': request.user.classroom,
+        'leaderboard_data': leaderboard_data,
+    }
+    
+    return render(request, 'game/leaderboard.html', context)
+

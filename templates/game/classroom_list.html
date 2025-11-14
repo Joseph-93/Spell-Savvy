@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+
+{% block title %}My Classrooms - Spelling Game{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header-section">
+        <h2>📚 My Classrooms</h2>
+        <button onclick="showCreateModal()" class="btn btn-primary">+ Create New Classroom</button>
+    </div>
+    
+    {% if classrooms %}
+    <div class="classroom-grid">
+        {% for classroom in classrooms %}
+        <div class="classroom-card">
+            <div class="classroom-header">
+                <h3>{{ classroom.name }}</h3>
+                <span class="student-count">{{ classroom.student_count }} student{{ classroom.student_count|pluralize }}</span>
+            </div>
+            <div class="classroom-body">
+                <div class="join-code-section">
+                    <label>Join Code:</label>
+                    <div class="code-display">{{ classroom.join_code }}</div>
+                </div>
+                <div class="classroom-actions">
+                    <a href="{% url 'classroom_detail' classroom.id %}" class="btn btn-secondary">View Details</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">🎓</div>
+        <h3>No classrooms yet</h3>
+        <p>Create your first classroom to get started!</p>
+        <button onclick="showCreateModal()" class="btn btn-primary">Create Classroom</button>
+    </div>
+    {% endif %}
+    
+    <div class="back-link">
+        <a href="{% url 'teacher_dashboard' %}">← Back to Dashboard</a>
+    </div>
+</div>
+
+<!-- Create Classroom Modal -->
+<div id="create-modal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Create New Classroom</h3>
+        <form method="post" action="{% url 'classroom_create' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="classroom_name">Classroom Name:</label>
+                <input 
+                    type="text" 
+                    id="classroom_name" 
+                    name="classroom_name" 
+                    placeholder="e.g., Period 1, English 101, Morning Class"
+                    required
+                    autofocus
+                >
+                <p class="help-text">Give your classroom a name that helps you identify it (e.g., period, subject, time)</p>
+            </div>
+            <div class="modal-actions">
+                <button type="button" onclick="hideCreateModal()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Classroom</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .container {
+        max-width: 1200px;
+        margin: 2rem auto;
+        padding: 0 2rem;
+    }
+    
+    .header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    
+    .header-section h2 {
+        margin: 0;
+        color: #333;
+    }
+    
+    .classroom-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .classroom-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .classroom-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .classroom-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+    }
+    
+    .classroom-header h3 {
+        margin: 0 0 0.5rem 0;
+        font-size: 1.3rem;
+    }
+    
+    .student-count {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    .classroom-body {
+        padding: 1.5rem;
+    }
+    
+    .join-code-section {
+        margin-bottom: 1rem;
+    }
+    
+    .join-code-section label {
+        display: block;
+        font-size: 0.85rem;
+        color: #666;
+        margin-bottom: 0.5rem;
+    }
+    
+    .code-display {
+        background: #f0f0f0;
+        padding: 0.75rem;
+        border-radius: 6px;
+        font-family: 'Courier New', monospace;
+        font-size: 1.2rem;
+        font-weight: bold;
+        text-align: center;
+        letter-spacing: 2px;
+        color: #333;
+    }
+    
+    .classroom-actions {
+        margin-top: 1rem;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: #f8f9fa;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+    }
+    
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+    
+    .empty-state h3 {
+        color: #333;
+        margin-bottom: 0.5rem;
+    }
+    
+    .empty-state p {
+        color: #666;
+        margin-bottom: 1.5rem;
+    }
+    
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .modal-overlay.show {
+        display: flex;
+    }
+    
+    .modal-content {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+    
+    .modal-content h3 {
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        color: #333;
+    }
+    
+    .modal-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        margin-top: 1.5rem;
+    }
+    
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    
+    .btn-primary {
+        background: #667eea;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #5568d3;
+    }
+    
+    .btn-secondary {
+        background: #f0f0f0;
+        color: #333;
+    }
+    
+    .btn-secondary:hover {
+        background: #e0e0e0;
+    }
+    
+    .back-link {
+        margin-top: 2rem;
+    }
+    
+    .back-link a {
+        color: #667eea;
+        text-decoration: none;
+    }
+    
+    .back-link a:hover {
+        text-decoration: underline;
+    }
+    
+    .help-text {
+        font-size: 0.85rem;
+        color: #666;
+        margin-top: 0.5rem;
+    }
+</style>
+
+<script>
+function showCreateModal() {
+    document.getElementById('create-modal').classList.add('show');
+    document.getElementById('classroom_name').focus();
+}
+
+function hideCreateModal() {
+    document.getElementById('create-modal').classList.remove('show');
+}
+
+// Close modal on outside click
+document.getElementById('create-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        hideCreateModal();
+    }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        hideCreateModal();
+    }
+});
+</script>
+{% endblock %}

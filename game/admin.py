@@ -1,8 +1,17 @@
 from django.contrib import admin
 from .models import (
     Word, GameConfiguration, StudentProgress, GameSession,
-    WordAttempt, BucketProgress, WordQueue
+    WordAttempt, BucketProgress, WordQueue, Classroom
 )
+
+
+@admin.register(Classroom)
+class ClassroomAdmin(admin.ModelAdmin):
+    list_display = ['name', 'teacher', 'join_code', 'student_count', 'is_active', 'created_at']
+    list_filter = ['is_active', 'teacher', 'created_at']
+    search_fields = ['name', 'join_code', 'teacher__username']
+    readonly_fields = ['join_code', 'created_at']
+    ordering = ['teacher', 'name']
 
 
 @admin.register(Word)

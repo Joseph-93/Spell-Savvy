@@ -37,7 +37,19 @@ def register_view(request):
     if request.user.is_authenticated:
         return redirect('home')
     
-    # Get all teachers for the dropdown
+    # Check if there's a join code in the URL
+    join_code = request.GET.get('join', '').strip().upper()
+    classroom = None
+    
+    if join_code:
+        try:
+            from game.models import Classroom
+            classroom = Classroom.objects.get(join_code=join_code, is_active=True)
+        except Classroom.DoesNotExist:
+            messages.error(request, f'Invalid or expired join code: {join_code}')
+            join_code = None
+    
+    # Get all teachers for the dropdown (fallback)
     teachers = User.objects.filter(role='teacher').order_by('username')
     
     if request.method == 'POST':
@@ -47,14 +59,15 @@ def register_view(request):
         email = request.POST.get('email', '')
         role = request.POST.get('role', 'student')
         teacher_id = request.POST.get('teacher')
+        join_code_submitted = request.POST.get('join_code', '').strip().upper()
         
         # Validate
         if password != password_confirm:
             messages.error(request, 'Passwords do not match')
         elif User.objects.filter(username=username).exists():
             messages.error(request, 'Username already exists')
-        elif role == 'student' and not teacher_id:
-            messages.error(request, 'Students must select a teacher')
+        elif role == 'student' and not teacher_id and not join_code_submitted:
+            messages.error(request, 'Students must select a teacher or use a join code')
         else:
             # Create user
             user = User.objects.create_user(
@@ -64,8 +77,25 @@ def register_view(request):
                 role=role
             )
             
-            # Assign teacher if student
-            if role == 'student' and teacher_id:
+            # Handle classroom join code (preferred method)
+            if role == 'student' and join_code_submitted:
+                try:
+                    from game.models import Classroom
+                    classroom_obj = Classroom.objects.get(
+                        join_code=join_code_submitted,
+                        is_active=True
+                    )
+                    user.classroom = classroom_obj
+                    user.teacher = classroom_obj.teacher  # Set legacy field too
+                    user.save()
+                    messages.success(
+                        request,
+                        f'✅ Joined {classroom_obj.name} (Teacher: {classroom_obj.teacher.username})'
+                    )
+                except:
+                    messages.warning(request, 'Join code invalid, but account created')
+            # Fallback to teacher selection (legacy)
+            elif role == 'student' and teacher_id:
                 try:
                     teacher = User.objects.get(id=teacher_id, role='teacher')
                     user.teacher = teacher
@@ -84,7 +114,13 @@ def register_view(request):
             else:
                 return redirect('student_game')
     
-    return render(request, 'accounts/register.html', {'teachers': teachers})
+    context = {
+        'teachers': teachers,
+        'join_code': join_code,
+        'classroom': classroom,
+    }
+    
+    return render(request, 'accounts/register.html', context)
 
 
 @login_required

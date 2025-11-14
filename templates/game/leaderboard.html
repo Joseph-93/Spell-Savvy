@@ -1,0 +1,376 @@
+{% extends 'base.html' %}
+
+{% block title %}Leaderboard - {{ classroom.name }}{% endblock %}
+
+{% block content %}
+<div class="leaderboard-container">
+    <div class="header-section">
+        <h2>🏆 {{ classroom.name }} - Leaderboard</h2>
+        <a href="{% url 'student_dashboard' %}" class="btn-back">← Back to Dashboard</a>
+    </div>
+    
+    {% if leaderboard_data.current_student %}
+    <div class="your-stats">
+        <div class="stats-card">
+            <div class="stat-header">📊 Your Stats</div>
+            <div class="stat-grid">
+                <div class="stat-item">
+                    <div class="stat-label">Your Rank</div>
+                    <div class="stat-value rank-badge rank-{{ leaderboard_data.current_student.rank }}">
+                        #{{ leaderboard_data.current_student.rank }}
+                        <span class="total-students">/ {{ leaderboard_data.total_students }}</span>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Your Score</div>
+                    <div class="stat-value">{{ leaderboard_data.current_student.score }}</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Accuracy</div>
+                    <div class="stat-value">{{ leaderboard_data.current_student.accuracy|floatformat:1 }}%</div>
+                </div>
+                {% if leaderboard_data.gap_to_next > 0 %}
+                <div class="stat-item highlight">
+                    <div class="stat-label">Gap to Next</div>
+                    <div class="stat-value gap">
+                        <span class="gap-points">{{ leaderboard_data.gap_to_next }}</span> points
+                        <div class="gap-subtitle">behind {{ leaderboard_data.next_student.student.username }}</div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="stat-item highlight">
+                    <div class="stat-label">🎉 Status</div>
+                    <div class="stat-value champion">You're #1!</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="leaderboard-section">
+        <h3>🌟 Top Students</h3>
+        {% if leaderboard_data.top_5 %}
+        <div class="leaderboard-list">
+            {% for entry in leaderboard_data.top_5 %}
+            <div class="leaderboard-entry {% if entry.student.id == user.id %}current-user{% endif %} rank-{{ entry.rank }}">
+                <div class="rank-badge-large">
+                    {% if entry.rank == 1 %}
+                        🥇
+                    {% elif entry.rank == 2 %}
+                        🥈
+                    {% elif entry.rank == 3 %}
+                        🥉
+                    {% else %}
+                        <span class="rank-number">#{{ entry.rank }}</span>
+                    {% endif %}
+                </div>
+                <div class="student-info">
+                    <div class="student-name">
+                        {{ entry.student.username }}
+                        {% if entry.student.id == user.id %}
+                            <span class="you-badge">YOU</span>
+                        {% endif %}
+                    </div>
+                    <div class="student-details">
+                        Bucket {{ entry.progress.current_bucket }} • 
+                        {{ entry.progress.total_words_correct }} correct • 
+                        {{ entry.accuracy|floatformat:1 }}% accuracy
+                    </div>
+                </div>
+                <div class="score-display">
+                    <div class="score-value">{{ entry.score }}</div>
+                    <div class="score-label">points</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No students in the leaderboard yet. Start playing to appear here!</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="info-section">
+        <h4>📈 How Scoring Works</h4>
+        <div class="scoring-info">
+            <div class="scoring-item">
+                <span class="scoring-icon">✓</span>
+                <div>
+                    <strong>Base Points:</strong> 1 point per word correct
+                </div>
+            </div>
+            <div class="scoring-item">
+                <span class="scoring-icon">📚</span>
+                <div>
+                    <strong>Bucket Bonus:</strong> Current bucket × 10 points
+                </div>
+            </div>
+            <div class="scoring-item">
+                <span class="scoring-icon">🎯</span>
+                <div>
+                    <strong>Accuracy Bonus:</strong> Your accuracy % ÷ 10 points
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .leaderboard-container {
+        max-width: 1000px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+    
+    .header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    
+    .header-section h2 {
+        margin: 0;
+        color: #333;
+    }
+    
+    .btn-back {
+        padding: 0.5rem 1rem;
+        background: #6c757d;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-size: 0.9rem;
+    }
+    
+    .btn-back:hover {
+        background: #5a6268;
+    }
+    
+    .your-stats {
+        margin-bottom: 2rem;
+    }
+    
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .stat-header {
+        font-size: 1.3rem;
+        font-weight: bold;
+        margin-bottom: 1.5rem;
+    }
+    
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+    }
+    
+    .stat-item {
+        text-align: center;
+    }
+    
+    .stat-item.highlight {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 1rem;
+        border-radius: 8px;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    
+    .stat-value.gap {
+        font-size: 1.5rem;
+    }
+    
+    .gap-points {
+        color: #ffd700;
+        font-size: 2rem;
+    }
+    
+    .gap-subtitle {
+        font-size: 0.85rem;
+        opacity: 0.9;
+        margin-top: 0.25rem;
+    }
+    
+    .stat-value.champion {
+        color: #ffd700;
+        font-size: 1.8rem;
+    }
+    
+    .total-students {
+        font-size: 1rem;
+        opacity: 0.8;
+    }
+    
+    .leaderboard-section {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .leaderboard-section h3 {
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        color: #333;
+    }
+    
+    .leaderboard-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .leaderboard-entry {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        padding: 1.5rem;
+        background: #f8f9fa;
+        border-radius: 12px;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .leaderboard-entry:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .leaderboard-entry.current-user {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+        border: 2px solid #ffc107;
+    }
+    
+    .leaderboard-entry.rank-1 {
+        background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+    }
+    
+    .leaderboard-entry.rank-2 {
+        background: linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 100%);
+    }
+    
+    .leaderboard-entry.rank-3 {
+        background: linear-gradient(135deg, #cd7f32 0%, #e9b872 100%);
+    }
+    
+    .rank-badge-large {
+        font-size: 2.5rem;
+        min-width: 60px;
+        text-align: center;
+    }
+    
+    .rank-number {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #666;
+    }
+    
+    .student-info {
+        flex: 1;
+    }
+    
+    .student-name {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 0.25rem;
+    }
+    
+    .you-badge {
+        background: #667eea;
+        color: white;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        margin-left: 0.5rem;
+    }
+    
+    .student-details {
+        font-size: 0.9rem;
+        color: #666;
+    }
+    
+    .score-display {
+        text-align: right;
+    }
+    
+    .score-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #667eea;
+    }
+    
+    .score-label {
+        font-size: 0.8rem;
+        color: #666;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #666;
+    }
+    
+    .info-section {
+        background: #e3f2fd;
+        padding: 2rem;
+        border-radius: 12px;
+        border-left: 4px solid #2196F3;
+    }
+    
+    .info-section h4 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        color: #333;
+    }
+    
+    .scoring-info {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .scoring-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .scoring-icon {
+        font-size: 1.5rem;
+    }
+    
+    @media (max-width: 768px) {
+        .stat-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .leaderboard-entry {
+            flex-direction: column;
+            text-align: center;
+        }
+        
+        .score-display {
+            text-align: center;
+        }
+    }
+</style>
+{% endblock %}

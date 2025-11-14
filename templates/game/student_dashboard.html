@@ -144,6 +144,172 @@
         color: #999;
         font-style: italic;
     }
+    
+    /* Leaderboard Widget Styles */
+    .leaderboard-widget {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .widget-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .widget-header h2 {
+        margin: 0;
+        color: #333;
+    }
+    
+    .btn-view-full {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: bold;
+        padding: 0.5rem 1rem;
+        border: 2px solid #667eea;
+        border-radius: 6px;
+        transition: all 0.2s;
+    }
+    
+    .btn-view-full:hover {
+        background: #667eea;
+        color: white;
+    }
+    
+    .your-rank-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        align-items: center;
+    }
+    
+    .rank-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .rank-badge-large {
+        font-size: 3rem;
+    }
+    
+    .your-rank-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    .your-rank-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+    
+    .score-info {
+        text-align: center;
+    }
+    
+    .your-score-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    .your-score-value {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    
+    .gap-info {
+        text-align: center;
+    }
+    
+    .gap-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    .gap-value {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #ffd700;
+    }
+    
+    .champion-badge {
+        text-align: center;
+        font-size: 1.3rem;
+        font-weight: bold;
+        color: #ffd700;
+    }
+    
+    .trophy {
+        font-size: 2rem;
+    }
+    
+    .top-students h3 {
+        margin-bottom: 1rem;
+        color: #333;
+        font-size: 1.2rem;
+    }
+    
+    .mini-leaderboard {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .mini-entry {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+        transition: transform 0.2s;
+    }
+    
+    .mini-entry:hover {
+        transform: translateX(5px);
+    }
+    
+    .mini-entry.current-user {
+        background: #fff3cd;
+        border: 2px solid #ffc107;
+    }
+    
+    .mini-rank {
+        font-size: 1.5rem;
+        min-width: 40px;
+        text-align: center;
+    }
+    
+    .mini-name {
+        flex: 1;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .you-tag {
+        background: #667eea;
+        color: white;
+        padding: 0.2rem 0.4rem;
+        border-radius: 3px;
+        font-size: 0.7rem;
+        margin-left: 0.5rem;
+    }
+    
+    .mini-score {
+        font-weight: bold;
+        color: #667eea;
+        font-size: 1.1rem;
+    }
 </style>
 {% endblock %}
 
@@ -185,6 +351,72 @@
             🎮 Start Playing
         </a>
     </div>
+    
+    {% if leaderboard_data %}
+    <div class="leaderboard-widget">
+        <div class="widget-header">
+            <h2>🏆 Classroom Leaderboard</h2>
+            <a href="{% url 'classroom_leaderboard' %}" class="btn-view-full">View Full Leaderboard →</a>
+        </div>
+        
+        {% if leaderboard_data.current_student %}
+        <div class="your-rank-card">
+            <div class="rank-info">
+                <div class="rank-badge-large">
+                    {% if leaderboard_data.current_student.rank == 1 %}
+                        🥇
+                    {% elif leaderboard_data.current_student.rank == 2 %}
+                        🥈
+                    {% elif leaderboard_data.current_student.rank == 3 %}
+                        🥉
+                    {% else %}
+                        #{{ leaderboard_data.current_student.rank }}
+                    {% endif %}
+                </div>
+                <div class="rank-details">
+                    <div class="your-rank-label">Your Rank</div>
+                    <div class="your-rank-value">#{{ leaderboard_data.current_student.rank }} of {{ leaderboard_data.total_students }}</div>
+                </div>
+            </div>
+            <div class="score-info">
+                <div class="your-score-label">Your Score</div>
+                <div class="your-score-value">{{ leaderboard_data.current_student.score }}</div>
+            </div>
+            {% if leaderboard_data.gap_to_next > 0 %}
+            <div class="gap-info">
+                <div class="gap-label">Gap to #{{ leaderboard_data.current_student.rank|add:"-1" }}</div>
+                <div class="gap-value">{{ leaderboard_data.gap_to_next }} pts behind {{ leaderboard_data.next_student.student.username }}</div>
+            </div>
+            {% else %}
+            <div class="champion-badge">
+                <span class="trophy">👑</span> You're the leader!
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <div class="top-students">
+            <h3>Top 5 Students</h3>
+            <div class="mini-leaderboard">
+                {% for entry in leaderboard_data.top_5 %}
+                <div class="mini-entry {% if entry.student.id == user.id %}current-user{% endif %}">
+                    <span class="mini-rank">
+                        {% if entry.rank == 1 %}🥇
+                        {% elif entry.rank == 2 %}🥈
+                        {% elif entry.rank == 3 %}🥉
+                        {% else %}#{{ entry.rank }}{% endif %}
+                    </span>
+                    <span class="mini-name">
+                        {{ entry.student.username }}
+                        {% if entry.student.id == user.id %}<span class="you-tag">YOU</span>{% endif %}
+                    </span>
+                    <span class="mini-score">{{ entry.score }} pts</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
     
     <div class="sessions-section">
         <h2>📊 Recent Sessions</h2>

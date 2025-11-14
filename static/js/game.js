@@ -3,6 +3,109 @@ let currentWord = null;
 let wordDefinition = null;
 let speechSpeed = 0.75; // Default speech speed
 
+// Update leaderboard widget with new data
+function updateLeaderboard(leaderboardData) {
+    if (!leaderboardData) return;
+    
+    const sidebar = document.querySelector('.leaderboard-sidebar');
+    if (!sidebar) return;
+    
+    const currentStudent = leaderboardData.current_student;
+    const top5 = leaderboardData.top_5;
+    
+    // Update rank badge
+    const rankBadge = sidebar.querySelector('.rank-badge');
+    if (rankBadge && currentStudent) {
+        // Determine badge color class
+        let colorClass = '';
+        if (currentStudent.rank === 1) colorClass = 'gold';
+        else if (currentStudent.rank === 2) colorClass = 'silver';
+        else if (currentStudent.rank === 3) colorClass = 'bronze';
+        
+        rankBadge.className = `rank-badge ${colorClass}`;
+        
+        // Update rank number
+        const rankNumber = rankBadge.querySelector('.rank-number');
+        if (rankNumber) {
+            if (currentStudent.rank === 1) rankNumber.textContent = '🥇';
+            else if (currentStudent.rank === 2) rankNumber.textContent = '🥈';
+            else if (currentStudent.rank === 3) rankNumber.textContent = '🥉';
+            else rankNumber.textContent = `#${currentStudent.rank}`;
+        }
+        
+        // Update rank total
+        const rankTotal = rankBadge.querySelector('.rank-total');
+        if (rankTotal) {
+            rankTotal.textContent = `of ${leaderboardData.total_students}`;
+        }
+        
+        // Update score
+        const scoreDisplay = rankBadge.querySelector('.score-display');
+        if (scoreDisplay) {
+            scoreDisplay.textContent = `${currentStudent.score} pts`;
+        }
+        
+        // Update gap or leader badge
+        let gapOrLeaderHtml = '';
+        if (currentStudent.rank === 1) {
+            gapOrLeaderHtml = '<div class="leader-badge">👑 You\'re the leader!</div>';
+        } else if (leaderboardData.gap_to_next && leaderboardData.next_student) {
+            gapOrLeaderHtml = `<div class="gap-display">${leaderboardData.gap_to_next} pts behind ${leaderboardData.next_student.username}</div>`;
+        }
+        
+        // Remove old gap/leader element and add new one
+        const oldGapOrLeader = rankBadge.querySelector('.gap-display, .leader-badge');
+        if (oldGapOrLeader) {
+            oldGapOrLeader.remove();
+        }
+        if (gapOrLeaderHtml) {
+            rankBadge.insertAdjacentHTML('beforeend', gapOrLeaderHtml);
+        }
+    }
+    
+    // Update top 5 list
+    const miniLeaderboard = sidebar.querySelector('.mini-leaderboard');
+    if (miniLeaderboard && top5 && top5.length > 0) {
+        const container = miniLeaderboard.querySelector('.mini-leaderboard-title').nextElementSibling.parentElement;
+        
+        // Find all existing items (after the title)
+        const existingItems = miniLeaderboard.querySelectorAll('.mini-leaderboard-item');
+        
+        // Update each item
+        top5.forEach((student, index) => {
+            let itemEl = existingItems[index];
+            
+            if (itemEl) {
+                // Update existing item
+                let itemClass = 'mini-leaderboard-item';
+                if (student.is_current) itemClass += ' highlighted';
+                else if (student.rank === 1) itemClass += ' top1';
+                else if (student.rank === 2) itemClass += ' top2';
+                else if (student.rank === 3) itemClass += ' top3';
+                
+                itemEl.className = itemClass;
+                
+                // Update medal/rank
+                let medal = '';
+                if (student.rank === 1) medal = '🥇';
+                else if (student.rank === 2) medal = '🥈';
+                else if (student.rank === 3) medal = '🥉';
+                else medal = `#${student.rank}`;
+                
+                const nameSpan = itemEl.querySelector('.mini-student-name');
+                if (nameSpan) {
+                    nameSpan.innerHTML = `${medal} ${student.username}${student.is_current ? ' (You)' : ''}`;
+                }
+                
+                const scoreSpan = itemEl.querySelector('.mini-student-score');
+                if (scoreSpan) {
+                    scoreSpan.textContent = student.score;
+                }
+            }
+        });
+    }
+}
+
 // Show congratulations modal
 function showCongratulationsModal(message) {
     const modal = document.getElementById('congratulations-modal');
@@ -340,6 +443,11 @@ async function submitAnswer() {
             document.getElementById('bucket-progress').textContent = data.words_mastered;
             document.getElementById('total-correct').textContent = data.total_correct;
             
+            // Update leaderboard if data is present
+            if (data.leaderboard) {
+                updateLeaderboard(data.leaderboard);
+            }
+            
             // Check if game is complete
             if (data.game_complete) {
                 setTimeout(() => {
@@ -369,6 +477,11 @@ async function submitAnswer() {
             document.getElementById('session-attempted').textContent = data.session_attempted;
             document.getElementById('bucket-progress').textContent = data.words_mastered;
             document.getElementById('total-correct').textContent = data.total_correct;
+            
+            // Update leaderboard if data is present
+            if (data.leaderboard) {
+                updateLeaderboard(data.leaderboard);
+            }
             
             // Check if game is complete (unlikely on incorrect answer, but possible)
             if (data.game_complete) {
@@ -406,9 +519,16 @@ function showDefinition() {
 
 // End session
 async function endSession() {
-    if (!confirm('Are you sure you want to end this session? Your progress will be saved.')) {
-        return;
-    }
+    // Show confirmation modal instead of confirm()
+    const confirmModal = document.getElementById('end-session-modal');
+    confirmModal.classList.add('show');
+}
+
+// Handle end session confirmation
+async function confirmEndSession() {
+    // Hide confirmation modal
+    const confirmModal = document.getElementById('end-session-modal');
+    confirmModal.classList.remove('show');
     
     try {
         const response = await fetch('/api/end-session/', {
@@ -421,14 +541,33 @@ async function endSession() {
         
         const data = await response.json();
         
-        alert(`Session ended!\nWords correct: ${data.words_correct}\nWords attempted: ${data.words_attempted}\nAccuracy: ${data.accuracy.toFixed(1)}%`);
+        // Show results modal with session statistics
+        const resultsModal = document.getElementById('end-session-results-modal');
+        const resultsDiv = document.getElementById('session-results');
         
-        window.location.reload();
+        resultsDiv.innerHTML = `
+            <p><strong>Words Correct:</strong> ${data.words_correct}</p>
+            <p><strong>Words Attempted:</strong> ${data.words_attempted}</p>
+            <p><strong>Accuracy:</strong> ${data.accuracy.toFixed(1)}%</p>
+        `;
+        
+        resultsModal.classList.add('show');
         
     } catch (error) {
         console.error('Error ending session:', error);
         alert('Error ending session.');
     }
+}
+
+// Cancel end session
+function cancelEndSession() {
+    const confirmModal = document.getElementById('end-session-modal');
+    confirmModal.classList.remove('show');
+}
+
+// Redirect to dashboard after viewing results
+function returnToDashboard() {
+    window.location.href = '/dashboard/';
 }
 
 // Event listeners
@@ -438,6 +577,11 @@ document.addEventListener('DOMContentLoaded', function() {
         closeCongratulationsModal();
         getNextWord();
     });
+    
+    // End session modal buttons
+    document.getElementById('modal-cancel-btn').addEventListener('click', cancelEndSession);
+    document.getElementById('modal-confirm-end-btn').addEventListener('click', confirmEndSession);
+    document.getElementById('modal-dashboard-btn').addEventListener('click', returnToDashboard);
     
     // Speed slider control
     const speedSlider = document.getElementById('speed-slider');

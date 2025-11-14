@@ -5,11 +5,38 @@
 
 {% block extra_css %}
 <style>
-    .game-container {
-        max-width: 1000px;
+    .page-wrapper {
+        max-width: 1400px;
         margin: 0.5rem auto;
-        text-align: center;
         padding: 0 1rem;
+    }
+    
+    .game-header {
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    
+    .game-header h2 {
+        font-size: 1.5rem;
+        margin: 0.5rem 0;
+        color: #333;
+    }
+    
+    .game-layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        align-items: start;
+    }
+    
+    @media (min-width: 1024px) {
+        .game-layout {
+            grid-template-columns: 1fr 300px;
+        }
+    }
+    
+    .game-container {
+        text-align: center;
     }
     
     .game-container h2 {
@@ -296,12 +323,171 @@
     .modal-button:active {
         transform: translateY(0);
     }
+    
+    /* Leaderboard Sidebar Widget */
+    .leaderboard-sidebar {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        height: fit-content;
+        position: sticky;
+        top: 1rem;
+    }
+    
+    .leaderboard-sidebar h3 {
+        font-size: 1.1rem;
+        margin: 0 0 0.75rem 0;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .rank-badge {
+        background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+        padding: 0.75rem;
+        border-radius: 8px;
+        text-align: center;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .rank-badge.gold {
+        background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+    }
+    
+    .rank-badge.silver {
+        background: linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 100%);
+    }
+    
+    .rank-badge.bronze {
+        background: linear-gradient(135deg, #cd7f32 0%, #e8b87a 100%);
+    }
+    
+    .rank-badge .rank-number {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: #333;
+        margin: 0;
+    }
+    
+    .rank-badge .rank-total {
+        font-size: 0.85rem;
+        color: #666;
+    }
+    
+    .rank-badge .score-display {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #333;
+        margin: 0.25rem 0;
+    }
+    
+    .rank-badge .gap-display {
+        font-size: 0.8rem;
+        color: #555;
+        margin: 0.25rem 0 0 0;
+    }
+    
+    .leader-badge {
+        background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+        color: #333;
+        padding: 0.5rem;
+        border-radius: 8px;
+        font-weight: bold;
+        margin-top: 0.25rem;
+    }
+    
+    .mini-leaderboard {
+        margin-top: 0.75rem;
+    }
+    
+    .mini-leaderboard-title {
+        font-size: 0.9rem;
+        font-weight: bold;
+        color: #666;
+        margin-bottom: 0.5rem;
+    }
+    
+    .mini-leaderboard-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.4rem 0.5rem;
+        margin-bottom: 0.3rem;
+        border-radius: 6px;
+        background: #f8f9fa;
+        font-size: 0.85rem;
+    }
+    
+    .mini-leaderboard-item.highlighted {
+        background: linear-gradient(135deg, #fff9e6 0%, #fffaed 100%);
+        border: 2px solid #ffd700;
+        font-weight: bold;
+    }
+    
+    .mini-leaderboard-item.top1 {
+        background: linear-gradient(135deg, #ffd70020 0%, #ffed4e20 100%);
+    }
+    
+    .mini-leaderboard-item.top2 {
+        background: linear-gradient(135deg, #c0c0c020 0%, #e8e8e820 100%);
+    }
+    
+    .mini-leaderboard-item.top3 {
+        background: linear-gradient(135deg, #cd7f3220 0%, #e8b87a20 100%);
+    }
+    
+    .mini-student-name {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    
+    .mini-student-score {
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .view-full-link {
+        display: block;
+        text-align: center;
+        margin-top: 0.75rem;
+        padding: 0.5rem;
+        background: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: bold;
+    }
+    
+    .view-full-link:hover {
+        background: #0056b3;
+    }
+    
+    .no-leaderboard {
+        text-align: center;
+        color: #999;
+        font-size: 0.9rem;
+        padding: 1rem;
+    }
+    
+    @media (max-width: 1023px) {
+        .leaderboard-sidebar {
+            position: static;
+            margin-top: 1rem;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="game-container">
-    <h2>🎮 Spelling Challenge</h2>
+<div class="page-wrapper">
+    <div class="game-header">
+        <h2>🎮 Spelling Challenge</h2>
+    </div>
     
     <div class="stats-bar">
         <div class="stat-card">
@@ -328,7 +514,9 @@
         </div>
     </div>
     
-    <div class="word-display">
+    <div class="game-layout">
+        <div class="game-container">
+            <div class="word-display">
         <div id="loading" class="loading">Loading word...</div>
         
         <div id="word-container" style="display: none;">
@@ -375,6 +563,58 @@
     </div>
     
     <button id="btn-end-session" class="btn-end-session">End Session</button>
+        </div>
+
+        <!-- Leaderboard Sidebar -->
+        {% if leaderboard_data %}
+        <div class="leaderboard-sidebar">
+    <h3>🏆 Leaderboard</h3>
+    
+    {% if leaderboard_data.current_student %}
+    <div class="rank-badge {% if leaderboard_data.current_student.rank == 1 %}gold{% elif leaderboard_data.current_student.rank == 2 %}silver{% elif leaderboard_data.current_student.rank == 3 %}bronze{% endif %}">
+        <div class="rank-number">
+            {% if leaderboard_data.current_student.rank == 1 %}🥇
+            {% elif leaderboard_data.current_student.rank == 2 %}🥈
+            {% elif leaderboard_data.current_student.rank == 3 %}🥉
+            {% else %}#{{ leaderboard_data.current_student.rank }}
+            {% endif %}
+        </div>
+        <div class="rank-total">of {{ leaderboard_data.total_students }}</div>
+        <div class="score-display">{{ leaderboard_data.current_student.score }} pts</div>
+        
+        {% if leaderboard_data.current_student.rank == 1 %}
+        <div class="leader-badge">👑 You're the leader!</div>
+        {% elif leaderboard_data.gap_to_next and leaderboard_data.next_student %}
+        <div class="gap-display">
+            {{ leaderboard_data.gap_to_next }} pts behind {{ leaderboard_data.next_student.username }}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    {% if leaderboard_data.top_5 %}
+    <div class="mini-leaderboard">
+        <div class="mini-leaderboard-title">Top 5 Students</div>
+        {% for student in leaderboard_data.top_5 %}
+        <div class="mini-leaderboard-item {% if student.is_current %}highlighted{% elif student.rank == 1 %}top1{% elif student.rank == 2 %}top2{% elif student.rank == 3 %}top3{% endif %}">
+            <span class="mini-student-name">
+                {% if student.rank == 1 %}🥇
+                {% elif student.rank == 2 %}🥈
+                {% elif student.rank == 3 %}🥉
+                {% else %}#{{ student.rank }}
+                {% endif %}
+                {{ student.username }}{% if student.is_current %} (You){% endif %}
+            </span>
+            <span class="mini-student-score">{{ student.score }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <a href="{% url 'classroom_leaderboard' %}" class="view-full-link">View Full Leaderboard →</a>
+        </div>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Congratulations Modal -->
@@ -386,8 +626,33 @@
         <button class="modal-button" id="modal-continue-btn">Continue</button>
     </div>
 </div>
+
+<!-- End Session Confirmation Modal -->
+<div id="end-session-modal" class="modal-overlay">
+    <div class="congratulations-modal" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+        <div class="emoji">🛑</div>
+        <h2>End Session?</h2>
+        <p>Are you sure you want to end this session? Your progress will be saved.</p>
+        <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 2rem;">
+            <button class="modal-button" id="modal-cancel-btn" style="background: #6c757d; color: white;">Cancel</button>
+            <button class="modal-button" id="modal-confirm-end-btn" style="background: white; color: #f5576c;">Yes, End Session</button>
+        </div>
+    </div>
+</div>
+
+<!-- End Session Results Modal -->
+<div id="end-session-results-modal" class="modal-overlay">
+    <div class="congratulations-modal" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+        <div class="emoji">📊</div>
+        <h2>Session Complete!</h2>
+        <div id="session-results" style="font-size: 1.2rem; margin: 1.5rem 0;">
+            <!-- Results will be inserted here -->
+        </div>
+        <button class="modal-button" id="modal-dashboard-btn" style="background: white; color: #4facfe;">Return to Dashboard</button>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/game.js' %}?v=4"></script>
+<script src="{% static 'js/game.js' %}?v=5"></script>
 {% endblock %}

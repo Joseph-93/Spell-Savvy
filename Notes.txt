@@ -1,6 +1,5 @@
-- The UI must ALL be ABOVE-FOLD
-- Does advancement actually work properly??
+- Give bigger words bigger scores.
+- It looks like missed words can kinda hold a user "hostage" when they should be able to move on.
 - Allow teachers to add in their own words!
 - The requirements of moving to the next bucket need to be displayed
 - Give the students scores and make the scores publicly available!
-- Whenever you click "End Session", "Yes", it doesn't actually change the page!

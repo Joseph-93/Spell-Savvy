@@ -6,8 +6,26 @@
 <div class="auth-container">
     <div class="auth-card">
         <h2>Register</h2>
+        
+        {% if classroom %}
+        <div class="join-code-banner">
+            <div class="banner-icon">🎓</div>
+            <div class="banner-content">
+                <h3>You're joining: {{ classroom.name }}</h3>
+                <p>Teacher: {{ classroom.teacher.username }}</p>
+                <p class="join-code-display">Join Code: <strong>{{ join_code }}</strong></p>
+            </div>
+        </div>
+        {% endif %}
+        
         <form method="post" id="registerForm">
             {% csrf_token %}
+            
+            {% if join_code %}
+            <input type="hidden" name="join_code" value="{{ join_code }}">
+            <input type="hidden" name="role" value="student">
+            {% endif %}
+            
             <div class="form-group">
                 <label for="username">Username:</label>
                 <input type="text" id="username" name="username" required>
@@ -24,6 +42,8 @@
                 <label for="password_confirm">Confirm Password:</label>
                 <input type="password" id="password_confirm" name="password_confirm" required>
             </div>
+            
+            {% if not join_code %}
             <div class="form-group">
                 <label for="role">I am a:</label>
                 <select id="role" name="role" required onchange="toggleTeacherField()">
@@ -31,16 +51,19 @@
                     <option value="teacher">Teacher</option>
                 </select>
             </div>
+            
             <div class="form-group" id="teacherField">
                 <label for="teacher">Select Your Teacher:</label>
-                <select id="teacher" name="teacher" required>
+                <select id="teacher" name="teacher">
                     <option value="">-- Choose a teacher --</option>
                     {% for t in teachers %}
                         <option value="{{ t.id }}">{{ t.username }}{% if t.first_name %} ({{ t.first_name }} {{ t.last_name }}){% endif %}</option>
                     {% endfor %}
                 </select>
-                <p class="help-text">You must select your teacher to register as a student.</p>
+                <p class="help-text">Or ask your teacher for a classroom join link!</p>
             </div>
+            {% endif %}
+            
             <button type="submit" class="btn btn-primary">Register</button>
         </form>
         <p class="auth-link">
@@ -50,6 +73,7 @@
 </div>
 
 <script>
+{% if not join_code %}
 function toggleTeacherField() {
     const role = document.getElementById('role').value;
     const teacherField = document.getElementById('teacherField');
@@ -68,6 +92,7 @@ function toggleTeacherField() {
 document.addEventListener('DOMContentLoaded', function() {
     toggleTeacherField();
 });
+{% endif %}
 </script>
 
 <style>
@@ -75,6 +100,44 @@ document.addEventListener('DOMContentLoaded', function() {
         font-size: 0.85rem;
         color: #666;
         margin-top: 0.25rem;
+    }
+    
+    .join-code-banner {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .banner-icon {
+        font-size: 3rem;
+    }
+    
+    .banner-content h3 {
+        margin: 0 0 0.5rem 0;
+        font-size: 1.3rem;
+    }
+    
+    .banner-content p {
+        margin: 0.25rem 0;
+        opacity: 0.95;
+    }
+    
+    .join-code-display {
+        font-size: 1.1rem;
+        margin-top: 0.5rem !important;
+    }
+    
+    .join-code-display strong {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 0.3rem 0.6rem;
+        border-radius: 4px;
+        letter-spacing: 1px;
     }
 </style>
 {% endblock %}
