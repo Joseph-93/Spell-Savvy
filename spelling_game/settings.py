@@ -25,7 +25,7 @@ SECRET_KEY = "django-insecure-_ar+qjn72ta6eu5$lm!-t2e*0g4lhx!y^td84&w%!0kawl-%b-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['eduflows.org']
+ALLOWED_HOSTS = ['eduflows.org', 'localhost', '127.0.0.1']
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
