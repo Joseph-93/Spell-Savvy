@@ -126,14 +126,13 @@ class StudentProgress(models.Model):
         on_delete=models.CASCADE,
         related_name='progress'
     )
-    current_bucket = models.IntegerField(default=3)  # Start with 3-letter words
-    custom_starting_bucket = models.IntegerField(
-        null=True,
-        blank=True,
-        help_text="Custom starting bucket set by teacher (overrides default)"
-    )
+    current_bucket = models.IntegerField(null=True, blank=True)
     total_words_correct = models.IntegerField(default=0)
     total_attempts = models.IntegerField(default=0)
+    total_points_earned = models.IntegerField(
+        default=0,
+        help_text="Total points earned from correct words (points = word length)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -164,11 +163,11 @@ class StudentProgress(models.Model):
     def score(self):
         """
         Calculate student's total score based on:
-        - Total words correct (1 point each)
+        - Points from correct words (word length = points)
         - Bucket level bonus (current_bucket * 10)
         - Accuracy bonus (accuracy percentage / 10)
         """
-        base_score = self.total_words_correct
+        base_score = self.total_points_earned  # Points based on word length
         bucket_bonus = self.current_bucket * 10
         
         # Calculate accuracy bonus

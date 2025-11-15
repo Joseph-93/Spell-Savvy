@@ -31,11 +31,15 @@ Click "View Full Leaderboard" to see:
 
 Your score is calculated based on three factors:
 
-### 1. **Base Points** (1 point per word)
+### 1. **Base Points** (Word length = points earned)
 ```
-Total Words Correct × 1 point
+Sum of all correct word lengths
 ```
-Example: 150 words correct = 150 points
+Example: 
+- "cat" (3 letters) = 3 points
+- "elephant" (8 letters) = 8 points  
+- "extraordinary" (13 letters) = 13 points
+- Total for these 3 words = 24 points
 
 ### 2. **Bucket Bonus** (Current bucket × 10)
 ```
@@ -57,16 +61,26 @@ Score = Base Points + Bucket Bonus + Accuracy Bonus
 ### **Example Calculation**
 ```
 Student: Alice
-- Words Correct: 150
+- Words Correct: 50 words
+- Total Points from Words: 350 (average ~7 letters per word)
 - Current Bucket: 5
 - Accuracy: 85%
 
-Base Points:    150 × 1  = 150
+Base Points:    350
 Bucket Bonus:   5 × 10   = 50
 Accuracy Bonus: 85 ÷ 10  = 8
 
-Total Score: 150 + 50 + 8 = 208 points
+Total Score: 350 + 50 + 8 = 408 points
 ```
+
+### **Why Word Length = Points?**
+This rewards students for tackling harder, longer words:
+- 3-letter words = 3 points each
+- 5-letter words = 5 points each
+- 10-letter words = 10 points each
+- 20-letter words = 20 points each
+
+Students in higher buckets naturally earn more points per word!
 
 ## UI Components
 

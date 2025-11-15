@@ -319,6 +319,8 @@ def submit_answer(request):
     progress.total_attempts += 1
     if is_correct:
         progress.total_words_correct += 1
+        # Award points based on word length
+        progress.total_points_earned += word.word_length
     progress.save()
     
     # Handle word queue
