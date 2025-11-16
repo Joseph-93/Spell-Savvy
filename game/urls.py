@@ -12,6 +12,7 @@ urlpatterns = [
     path('teacher/', views.teacher_dashboard, name='teacher_dashboard'),
     path('teacher/student/<int:student_id>/', views.student_detail, name='student_detail'),
     path('teacher/config/', views.teacher_config, name='teacher_config'),
+    path('teacher/config/bulk-assign/', views.bulk_assign_students, name='bulk_assign_students'),
     path('teacher/student/<int:student_id>/update-bucket/', views.update_student_starting_bucket, name='update_student_starting_bucket'),
     
     # Classroom management

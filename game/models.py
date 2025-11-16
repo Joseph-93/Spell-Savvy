@@ -144,10 +144,7 @@ class StudentProgress(models.Model):
     
     def get_starting_bucket(self):
         """Get the starting bucket for this student"""
-        # Priority: custom setting > teacher default > system default (3)
-        if self.custom_starting_bucket:
-            return self.custom_starting_bucket
-        
+        # Priority: teacher default > system default (3)
         # Get teacher's default setting (support both classroom and legacy)
         teacher = self.student.get_teacher()
         if teacher:

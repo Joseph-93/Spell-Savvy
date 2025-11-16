@@ -324,15 +324,226 @@
         transform: translateY(0);
     }
     
+    /* Sidebar Container */
+    .sidebar-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    /* Bucket Progress Widget */
+    .progress-widget {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .progress-widget h3 {
+        font-size: 1.1rem;
+        margin: 0 0 0.75rem 0;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .bucket-info {
+        margin-bottom: 0.75rem;
+    }
+    
+    .current-bucket-display {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 0.75rem;
+        border-radius: 8px;
+        color: white;
+    }
+    
+    .bucket-label {
+        font-size: 0.85rem;
+        opacity: 0.9;
+    }
+    
+    .bucket-number {
+        font-size: 1.8rem;
+        font-weight: bold;
+    }
+    
+    .progress-stats {
+        background: #f8f9fa;
+        padding: 0.75rem;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+    }
+    
+    .stat-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.25rem 0;
+        font-size: 0.9rem;
+    }
+    
+    .stat-label {
+        color: #666;
+    }
+    
+    .stat-value {
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .stat-value.remaining {
+        color: #ff9800;
+    }
+    
+    .progress-bar-container {
+        margin: 0.75rem 0;
+    }
+    
+    .progress-bar-bg {
+        background: #e0e0e0;
+        border-radius: 20px;
+        height: 24px;
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .progress-bar-fill {
+        background: linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%);
+        height: 100%;
+        border-radius: 20px;
+        transition: width 0.5s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 30px;
+        position: relative;
+    }
+    
+    .progress-percentage {
+        color: white;
+        font-weight: bold;
+        font-size: 0.75rem;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    }
+    
+    .progress-message {
+        text-align: center;
+        margin: 0.75rem 0;
+    }
+    
+    .progress-message p {
+        margin: 0;
+        padding: 0.5rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    
+    .complete-message {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .almost-message {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.02); }
+    }
+    
+    .halfway-message {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+    
+    .progress-message-text {
+        background: #e7f3ff;
+        color: #004085;
+        border: 1px solid #b8daff;
+    }
+    
+    .start-message {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    /* Words in Progress Section */
+    .words-in-progress {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin: 0.75rem 0;
+        border: 1px solid #e0e0e0;
+    }
+    
+    .words-in-progress h4 {
+        font-size: 0.9rem;
+        margin: 0 0 0.5rem 0;
+        color: #555;
+        font-weight: 600;
+    }
+    
+    .progress-breakdown {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+    
+    .progress-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0.5rem;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .need-icon {
+        font-size: 1rem;
+    }
+    
+    .need-count {
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: #667eea;
+        min-width: 25px;
+        text-align: center;
+    }
+    
+    .need-label {
+        font-size: 0.85rem;
+        color: #666;
+        flex: 1;
+    }
+    
+    .next-bucket-info {
+        text-align: center;
+        color: #666;
+        font-size: 0.8rem;
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid #e0e0e0;
+    }
+    
     /* Leaderboard Sidebar Widget */
     .leaderboard-sidebar {
         background: white;
         border-radius: 12px;
         padding: 1rem;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        height: fit-content;
-        position: sticky;
-        top: 1rem;
     }
     
     .leaderboard-sidebar h3 {
@@ -565,9 +776,88 @@
     <button id="btn-end-session" class="btn-end-session">End Session</button>
         </div>
 
-        <!-- Leaderboard Sidebar -->
-        {% if leaderboard_data %}
-        <div class="leaderboard-sidebar">
+        <!-- Sidebar Widgets -->
+        <div class="sidebar-container">
+            <!-- Bucket Progress Widget -->
+            <div class="progress-widget">
+                <h3>📊 Bucket Progress</h3>
+                
+                <div class="bucket-info">
+                    <div class="current-bucket-display">
+                        <span class="bucket-label">Current Bucket</span>
+                        <span class="bucket-number">{{ progress.current_bucket }}</span>
+                    </div>
+                </div>
+                
+                <div class="progress-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">Words Mastered:</span>
+                        <span class="stat-value" id="sidebar-words-mastered">{{ bucket_progress.words_mastered }}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Goal:</span>
+                        <span class="stat-value">{{ config.words_to_complete_bucket }}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Remaining:</span>
+                        <span class="stat-value remaining" id="sidebar-words-remaining">{{ config.words_to_complete_bucket|add:"-"|add:bucket_progress.words_mastered }}</span>
+                    </div>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="progress-bar-container">
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="sidebar-progress-fill" style="width: {% widthratio bucket_progress.words_mastered config.words_to_complete_bucket 100 %}%">
+                            <span class="progress-percentage">{% widthratio bucket_progress.words_mastered config.words_to_complete_bucket 100 %}%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="progress-message">
+                    {% widthratio bucket_progress.words_mastered config.words_to_complete_bucket 100 as progress_percent %}
+                    {% if progress_percent >= 100 %}
+                        <p class="complete-message">✅ Bucket complete! Keep playing to advance!</p>
+                    {% elif progress_percent >= 75 %}
+                        <p class="almost-message">🔥 Almost there! Just {{ config.words_to_complete_bucket|add:"-"|add:bucket_progress.words_mastered }} more!</p>
+                    {% elif progress_percent >= 50 %}
+                        <p class="halfway-message">💪 Halfway there! Keep going!</p>
+                    {% elif progress_percent >= 25 %}
+                        <p class="progress-message-text">📈 Making progress! {{ config.words_to_complete_bucket|add:"-"|add:bucket_progress.words_mastered }} words to go!</p>
+                    {% else %}
+                        <p class="start-message">🚀 Let's master this bucket!</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Words in Progress Section -->
+                <div class="words-in-progress">
+                    <h4>📝 Words in Progress</h4>
+                    <div class="progress-breakdown">
+                        <div class="progress-item" id="words-need-1">
+                            <span class="need-icon">🎯</span>
+                            <span class="need-count">{{ words_need_1 }}</span>
+                            <span class="need-label">need 1 more</span>
+                        </div>
+                        <div class="progress-item" id="words-need-2">
+                            <span class="need-icon">📚</span>
+                            <span class="need-count">{{ words_need_2 }}</span>
+                            <span class="need-label">need 2 more</span>
+                        </div>
+                        <div class="progress-item" id="words-need-3">
+                            <span class="need-icon">💪</span>
+                            <span class="need-count">{{ words_need_3 }}</span>
+                            <span class="need-label">need 3 more</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="next-bucket-info">
+                    <small>Next: Bucket {{ progress.current_bucket|add:"1" }} ({{ progress.current_bucket|add:"1" }}-letter words)</small>
+                </div>
+            </div>
+
+            <!-- Leaderboard Sidebar -->
+            {% if leaderboard_data %}
+            <div class="leaderboard-sidebar">
     <h3>🏆 Leaderboard</h3>
     
     {% if leaderboard_data.current_student %}
@@ -612,8 +902,9 @@
     {% endif %}
     
     <a href="{% url 'classroom_leaderboard' %}" class="view-full-link">View Full Leaderboard →</a>
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 </div>
 
@@ -654,5 +945,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/game.js' %}?v=5"></script>
+<script src="{% static 'js/game.js' %}?v=9"></script>
 {% endblock %}

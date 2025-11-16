@@ -3,6 +3,69 @@ let currentWord = null;
 let wordDefinition = null;
 let speechSpeed = 0.75; // Default speech speed
 
+// Update bucket progress widget
+function updateBucketProgress(wordsMastered, wordsToComplete, wordsNeed1, wordsNeed2, wordsNeed3) {
+    // Update words mastered count
+    const wordsMasteredEl = document.getElementById('sidebar-words-mastered');
+    if (wordsMasteredEl) {
+        wordsMasteredEl.textContent = wordsMastered;
+    }
+    
+    // Update words remaining
+    const wordsRemaining = wordsToComplete - wordsMastered;
+    const wordsRemainingEl = document.getElementById('sidebar-words-remaining');
+    if (wordsRemainingEl) {
+        wordsRemainingEl.textContent = wordsRemaining;
+    }
+    
+    // Update progress bar
+    const progressPercent = Math.min(Math.round((wordsMastered / wordsToComplete) * 100), 100);
+    const progressFillEl = document.getElementById('sidebar-progress-fill');
+    if (progressFillEl) {
+        progressFillEl.style.width = progressPercent + '%';
+        
+        // Update percentage text
+        const percentageEl = progressFillEl.querySelector('.progress-percentage');
+        if (percentageEl) {
+            percentageEl.textContent = progressPercent + '%';
+        }
+    }
+    
+    // Update progress message
+    const progressMessageContainer = document.querySelector('.progress-message');
+    if (progressMessageContainer) {
+        let messageHtml = '';
+        
+        if (progressPercent >= 100) {
+            messageHtml = '<p class="complete-message">✅ Bucket complete! Keep playing to advance!</p>';
+        } else if (progressPercent >= 75) {
+            messageHtml = `<p class="almost-message">🔥 Almost there! Just ${wordsRemaining} more!</p>`;
+        } else if (progressPercent >= 50) {
+            messageHtml = '<p class="halfway-message">💪 Halfway there! Keep going!</p>';
+        } else if (progressPercent >= 25) {
+            messageHtml = `<p class="progress-message-text">📈 Making progress! ${wordsRemaining} words to go!</p>`;
+        } else {
+            messageHtml = '<p class="start-message">🚀 Let\'s master this bucket!</p>';
+        }
+        
+        progressMessageContainer.innerHTML = messageHtml;
+    }
+    
+    // Update words in progress counts
+    if (wordsNeed1 !== undefined) {
+        const need1El = document.querySelector('#words-need-1 .need-count');
+        if (need1El) need1El.textContent = wordsNeed1;
+    }
+    if (wordsNeed2 !== undefined) {
+        const need2El = document.querySelector('#words-need-2 .need-count');
+        if (need2El) need2El.textContent = wordsNeed2;
+    }
+    if (wordsNeed3 !== undefined) {
+        const need3El = document.querySelector('#words-need-3 .need-count');
+        if (need3El) need3El.textContent = wordsNeed3;
+    }
+}
+
 // Update leaderboard widget with new data
 function updateLeaderboard(leaderboardData) {
     if (!leaderboardData) return;
@@ -435,13 +498,35 @@ async function submitAnswer() {
         
         if (data.correct) {
             feedbackEl.className = 'feedback correct';
-            feedbackEl.innerHTML = `✅ Correct! The word is "${data.correct_spelling}"`;
+            
+            // Check if word is mastered or needs more attempts
+            if (data.word_correct_count >= data.word_mastery_required) {
+                feedbackEl.innerHTML = `✅ Correct! The word is "${data.correct_spelling}"<br>🎉 <strong>Word Mastered!</strong>`;
+            } else if (data.word_mastery_required > 1) {
+                // Word has been misspelled before, needs multiple attempts
+                const attemptsRemaining = data.word_mastery_required - data.word_correct_count;
+                feedbackEl.innerHTML = `✅ Correct! The word is "${data.correct_spelling}"<br>📚 Progress: ${data.word_correct_count}/${data.word_mastery_required} - Need ${attemptsRemaining} more to master!`;
+            } else {
+                // Word never failed, mastered on first attempt
+                feedbackEl.innerHTML = `✅ Correct! The word is "${data.correct_spelling}"<br>🎉 <strong>Word Mastered!</strong>`;
+            }
             
             // Update stats
             document.getElementById('session-correct').textContent = data.session_correct;
             document.getElementById('session-attempted').textContent = data.session_attempted;
             document.getElementById('bucket-progress').textContent = data.words_mastered;
             document.getElementById('total-correct').textContent = data.total_correct;
+            
+            // Update bucket progress widget
+            if (data.words_mastered !== undefined && data.words_to_complete !== undefined) {
+                updateBucketProgress(
+                    data.words_mastered, 
+                    data.words_to_complete,
+                    data.words_need_1,
+                    data.words_need_2,
+                    data.words_need_3
+                );
+            }
             
             // Update leaderboard if data is present
             if (data.leaderboard) {
@@ -477,6 +562,17 @@ async function submitAnswer() {
             document.getElementById('session-attempted').textContent = data.session_attempted;
             document.getElementById('bucket-progress').textContent = data.words_mastered;
             document.getElementById('total-correct').textContent = data.total_correct;
+            
+            // Update bucket progress widget (even on incorrect, attempts count)
+            if (data.words_mastered !== undefined && data.words_to_complete !== undefined) {
+                updateBucketProgress(
+                    data.words_mastered, 
+                    data.words_to_complete,
+                    data.words_need_1,
+                    data.words_need_2,
+                    data.words_need_3
+                );
+            }
             
             // Update leaderboard if data is present
             if (data.leaderboard) {

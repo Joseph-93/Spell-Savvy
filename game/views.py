@@ -4,7 +4,7 @@ from django.contrib.auth import login, authenticate, logout
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.db.models import Count, Q, Avg
+from django.db.models import Count, Q, Avg, Max, Min
 from django.utils import timezone
 from .models import (
     Word, GameSession, WordAttempt, StudentProgress,
@@ -162,12 +162,63 @@ def student_game(request):
     if request.user.classroom:
         leaderboard_data = get_classroom_leaderboard(request.user.classroom, request.user)
     
+    # Calculate words in progress (not yet mastered but in queue)
+    # ONLY count words that have been attempted at least once
+    words_in_progress = WordQueue.objects.filter(
+        student=request.user,
+        word__difficulty_bucket=progress.current_bucket,
+        is_mastered=False
+    )
+    
+    # Count how many words need 1, 2, or 3 more correct attempts
+    needs_1_more = 0
+    needs_2_more = 0
+    needs_3_more = 0
+    
+    for queue_item in words_in_progress:
+        # Check if word has been attempted at all
+        has_been_attempted = WordAttempt.objects.filter(
+            student=request.user,
+            word=queue_item.word
+        ).exists()
+        
+        if not has_been_attempted:
+            # Skip words that haven't been seen yet
+            continue
+            
+        if queue_item.times_failed > 0:
+            # Word has been failed - needs 3 correct total
+            correct_count = WordAttempt.objects.filter(
+                student=request.user,
+                word=queue_item.word,
+                is_correct=True
+            ).count()
+            remaining = 3 - correct_count
+            if remaining == 1:
+                needs_1_more += 1
+            elif remaining == 2:
+                needs_2_more += 1
+            elif remaining >= 3:
+                needs_3_more += 1
+        else:
+            # Word never failed but has been attempted - needs 1 correct
+            has_correct = WordAttempt.objects.filter(
+                student=request.user,
+                word=queue_item.word,
+                is_correct=True
+            ).exists()
+            if not has_correct:
+                needs_1_more += 1
+    
     context = {
         'progress': progress,
         'session': active_session,
         'bucket_progress': bucket_progress,
         'config': config,
         'leaderboard_data': leaderboard_data,
+        'words_need_1': needs_1_more,
+        'words_need_2': needs_2_more,
+        'words_need_3': needs_3_more,
     }
     
     return render(request, 'game/student_game.html', context)
@@ -184,39 +235,135 @@ def get_next_word(request):
     progress = StudentProgress.objects.get(student=request.user)
     current_bucket = progress.current_bucket
     
-    # Get game configuration
-    try:
+    # Get game configuration (use student's teacher's config)
+    teacher = request.user.get_teacher()
+    if teacher:
+        config = GameConfiguration.objects.filter(teacher=teacher).first()
+    else:
         config = GameConfiguration.objects.first()
-        if not config:
-            config = GameConfiguration.objects.create(
-                teacher=User.objects.filter(role='teacher').first() or request.user
-            )
-    except:
+    
+    if not config:
         config = GameConfiguration.objects.create(
             teacher=User.objects.filter(role='teacher').first() or request.user
         )
     
-    # Check if there are words in the queue
+    # CHECK IF CURRENT BUCKET IS ALREADY COMPLETE
+    # This handles the case where enough words were mastered but bucket wasn't advanced
+    bucket_progress = BucketProgress.objects.filter(
+        student=request.user,
+        bucket=current_bucket
+    ).first()
+    
+    if bucket_progress and bucket_progress.words_mastered >= config.words_to_complete_bucket:
+        # Before advancing, check if there are any words still in progress
+        # (words that have been attempted but not yet mastered)
+        words_in_progress = WordQueue.objects.filter(
+            student=request.user,
+            word__difficulty_bucket=current_bucket,
+            is_mastered=False
+        )
+        
+        # Count how many have been attempted
+        has_words_in_progress = False
+        for queue_item in words_in_progress:
+            has_been_attempted = WordAttempt.objects.filter(
+                student=request.user,
+                word=queue_item.word
+            ).exists()
+            if has_been_attempted:
+                has_words_in_progress = True
+                break
+        
+        # Only advance if there are NO words in progress
+        if not has_words_in_progress:
+            # Bucket should be complete! Mark it and advance
+            if not bucket_progress.is_completed:
+                bucket_progress.is_completed = True
+                bucket_progress.save()
+            
+            # Check if next bucket exists
+            next_bucket = current_bucket + 1
+            next_bucket_has_words = Word.objects.filter(difficulty_bucket=next_bucket).exists()
+            
+            if not next_bucket_has_words:
+                # Game complete!
+                return JsonResponse({
+                    'game_complete': True,
+                    'message': f'Congratulations! You have mastered all available buckets up to {current_bucket}-letter words!',
+                    'words_mastered': bucket_progress.words_mastered,
+                    'final_bucket': current_bucket
+                })
+            
+            # Move to next bucket
+            progress.current_bucket = next_bucket
+            progress.save()
+            
+            # Clean up unmastered words from the old bucket (they won't be used anymore)
+            WordQueue.objects.filter(
+                student=request.user,
+                word__difficulty_bucket=current_bucket,
+                is_mastered=False
+            ).delete()
+            
+            # Create new bucket progress if needed
+            BucketProgress.objects.get_or_create(
+                student=request.user,
+                bucket=next_bucket
+            )
+            
+            return JsonResponse({
+                'bucket_complete': True,
+                'new_bucket': next_bucket,
+                'words_mastered': bucket_progress.words_mastered
+            })
+    
+    # Check if there are words in the queue FROM THE CURRENT BUCKET
     queue_word = WordQueue.objects.filter(
         student=request.user,
+        word__difficulty_bucket=current_bucket,
         is_mastered=False
     ).order_by('position').first()
+    
+    # Always try to keep the queue populated with new words
+    # Get words from current bucket that haven't been mastered or queued
+    mastered_or_queued_words = WordQueue.objects.filter(
+        student=request.user
+    ).values_list('word_id', flat=True)
+    
+    available_words = Word.objects.filter(
+        difficulty_bucket=current_bucket
+    ).exclude(id__in=mastered_or_queued_words)
+    
+    # If there are available words, add some to the queue to keep it full
+    if available_words.exists():
+        # Add up to 5 new words to the queue each time
+        max_position = WordQueue.objects.filter(
+            student=request.user
+        ).aggregate(max_pos=Max('position'))['max_pos'] or 0
+        
+        words_to_add = min(5, available_words.count())
+        for i, word in enumerate(random.sample(list(available_words), words_to_add)):
+            WordQueue.objects.create(
+                student=request.user,
+                word=word,
+                position=max_position + i + 1
+            )
     
     if queue_word:
         word = queue_word.word
     else:
-        # Get words from current bucket that haven't been mastered
+        # Queue is empty - check if we should move to next bucket
         mastered_words = WordQueue.objects.filter(
             student=request.user,
             is_mastered=True
         ).values_list('word_id', flat=True)
         
-        available_words = Word.objects.filter(
+        all_words_in_bucket = Word.objects.filter(
             difficulty_bucket=current_bucket
         ).exclude(id__in=mastered_words)
         
-        if not available_words.exists():
-            # Check if next bucket has words before incrementing
+        if not all_words_in_bucket.exists():
+            # No more words in this bucket - check if next bucket has words
             next_bucket = current_bucket + 1
             next_bucket_words = Word.objects.filter(difficulty_bucket=next_bucket).exists()
             
@@ -242,19 +389,27 @@ def get_next_word(request):
                 'new_bucket': progress.current_bucket
             })
         
-        # Get random word from available words
-        word = random.choice(available_words)
-        
-        # Add to queue
-        max_position = WordQueue.objects.filter(
-            student=request.user
-        ).aggregate(max_pos=Count('id'))['max_pos'] or 0
-        
-        queue_word, created = WordQueue.objects.get_or_create(
+        # Queue is empty but words are available - return first queued word
+        # (The code above should have already added words to the queue)
+        queue_word = WordQueue.objects.filter(
             student=request.user,
-            word=word,
-            defaults={'position': max_position + 1}
-        )
+            is_mastered=False
+        ).order_by('position').first()
+        
+        if queue_word:
+            word = queue_word.word
+        else:
+            # Fallback: no words were added (shouldn't happen), add one now
+            word = random.choice(all_words_in_bucket)
+            max_position = WordQueue.objects.filter(
+                student=request.user
+            ).aggregate(max_pos=Max('position'))['max_pos'] or 0
+            
+            queue_word, created = WordQueue.objects.get_or_create(
+                student=request.user,
+                word=word,
+                defaults={'position': max_position + 1}
+            )
     
     return JsonResponse({
         'word_id': word.id,
@@ -331,84 +486,187 @@ def submit_answer(request):
     
     if queue_word:
         if is_correct:
-            # Mark as mastered
-            queue_word.is_mastered = True
-            queue_word.save()
+            # Check if word was already mastered BEFORE this attempt
+            was_already_mastered = queue_word.is_mastered
             
-            # Update bucket progress
-            bucket_progress, _ = BucketProgress.objects.get_or_create(
-                student=request.user,
-                bucket=word.difficulty_bucket
-            )
-            bucket_progress.words_mastered += 1
-            
-            # Check if bucket is complete
-            config = GameConfiguration.objects.first()
-            if config and bucket_progress.words_mastered >= config.words_to_complete_bucket:
-                bucket_progress.is_completed = True
-                bucket_progress.save()
+            if not was_already_mastered:
+                # Check if this word has ever been failed
+                has_been_failed = queue_word.times_failed > 0
                 
-                # Check if next bucket has words before moving
-                next_bucket = word.difficulty_bucket + 1
-                next_bucket_has_words = Word.objects.filter(difficulty_bucket=next_bucket).exists()
-                
-                if not next_bucket_has_words:
-                    # Game complete!
-                    leaderboard_data = None
-                    if request.user.classroom:
-                        raw_leaderboard = get_classroom_leaderboard(request.user.classroom, request.user)
-                        leaderboard_data = serialize_leaderboard_for_json(raw_leaderboard)
+                if has_been_failed:
+                    # Word was misspelled before - need 3 correct attempts total to master
+                    correct_attempts = WordAttempt.objects.filter(
+                        student=request.user,
+                        word=word,
+                        is_correct=True
+                    ).count()
                     
-                    return JsonResponse({
-                        'correct': True,
-                        'game_complete': True,
-                        'words_mastered': bucket_progress.words_mastered,
-                        'final_bucket': word.difficulty_bucket,
-                        'session_correct': session.words_correct,
-                        'session_attempted': session.words_attempted,
-                        'total_correct': progress.total_words_correct,
-                        'message': f'Congratulations! You have mastered all available buckets up to {word.difficulty_bucket}-letter words!',
-                        'leaderboard': leaderboard_data
-                    })
+                    if correct_attempts >= 3:
+                        # Now mastered after 3 correct attempts!
+                        queue_word.is_mastered = True
+                        queue_word.save()
+                        should_increment_bucket = True
+                    else:
+                        # Correct, but need more attempts - recycle the word
+                        # Get config for recycling distance (use student's teacher's config)
+                        teacher = request.user.get_teacher()
+                        if teacher:
+                            config = GameConfiguration.objects.filter(teacher=teacher).first()
+                        else:
+                            config = GameConfiguration.objects.first()
+                        
+                        if not config:
+                            config = GameConfiguration.objects.create(
+                                teacher=User.objects.filter(role='teacher').first() or request.user
+                            )
+                        
+                        # Calculate new position (AT THE FRONT, within recycling_distance)
+                        # Get the minimum position currently in the queue
+                        current_min_position = WordQueue.objects.filter(
+                            student=request.user,
+                            is_mastered=False
+                        ).aggregate(min_pos=Min('position'))['min_pos'] or 0
+                        
+                        # Place it at the front, randomly within 1 to recycling_distance positions from the start
+                        new_position = current_min_position + random.randint(1, min(config.recycling_distance, 50))
+                        queue_word.position = new_position
+                        queue_word.save()
+                        should_increment_bucket = False
+                else:
+                    # Word never failed - mastered on first correct attempt!
+                    queue_word.is_mastered = True
+                    queue_word.save()
+                    should_increment_bucket = True
                 
-                # Move to next bucket
-                progress.current_bucket = next_bucket
-                progress.save()
-                
-                leaderboard_data = None
-                if request.user.classroom:
-                    raw_leaderboard = get_classroom_leaderboard(request.user.classroom, request.user)
-                    leaderboard_data = serialize_leaderboard_for_json(raw_leaderboard)
-                
-                return JsonResponse({
-                    'correct': True,
-                    'bucket_complete': True,
-                    'words_mastered': bucket_progress.words_mastered,
-                    'new_bucket': progress.current_bucket,
-                    'session_correct': session.words_correct,
-                    'session_attempted': session.words_attempted,
-                    'total_correct': progress.total_words_correct,
-                    'leaderboard': leaderboard_data
-                })
-            
-            bucket_progress.save()
+                # Update bucket progress if word was newly mastered
+                if should_increment_bucket:
+                    bucket_progress, _ = BucketProgress.objects.get_or_create(
+                        student=request.user,
+                        bucket=word.difficulty_bucket
+                    )
+                    bucket_progress.words_mastered += 1
+                    
+                    # Check if bucket is complete (use student's teacher's config)
+                    teacher = request.user.get_teacher()
+                    if teacher:
+                        config = GameConfiguration.objects.filter(teacher=teacher).first()
+                    else:
+                        config = GameConfiguration.objects.first()
+                    
+                    if config and bucket_progress.words_mastered >= config.words_to_complete_bucket:
+                        # Before completing bucket, check if there are any words still in progress
+                        # (words that have been attempted but not yet mastered)
+                        words_in_progress = WordQueue.objects.filter(
+                            student=request.user,
+                            word__difficulty_bucket=word.difficulty_bucket,
+                            is_mastered=False
+                        )
+                        
+                        # Count how many have been attempted
+                        has_words_in_progress = False
+                        words_in_progress_count = 0
+                        for queue_item in words_in_progress:
+                            has_been_attempted = WordAttempt.objects.filter(
+                                student=request.user,
+                                word=queue_item.word
+                            ).exists()
+                            if has_been_attempted:
+                                has_words_in_progress = True
+                                words_in_progress_count += 1
+                                # DEBUG
+                                print(f'DEBUG: Word in progress: {queue_item.word.text}, times_failed={queue_item.times_failed}')
+                        
+                        # DEBUG
+                        print(f'DEBUG: Bucket {word.difficulty_bucket} - Mastered: {bucket_progress.words_mastered}, Required: {config.words_to_complete_bucket}, Words in progress: {words_in_progress_count}')
+                        
+                        # Only complete bucket if there are NO words in progress
+                        if not has_words_in_progress:
+                            bucket_progress.is_completed = True
+                            bucket_progress.save()
+                            
+                            print(f'DEBUG: ADVANCING TO NEXT BUCKET')
+                            
+                            # Check if next bucket has words before moving
+                            next_bucket = word.difficulty_bucket + 1
+                            next_bucket_has_words = Word.objects.filter(difficulty_bucket=next_bucket).exists()
+                            
+                            if not next_bucket_has_words:
+                                # Game complete!
+                                leaderboard_data = None
+                                if request.user.classroom:
+                                    raw_leaderboard = get_classroom_leaderboard(request.user.classroom, request.user)
+                                    leaderboard_data = serialize_leaderboard_for_json(raw_leaderboard)
+                                
+                                return JsonResponse({
+                                    'correct': True,
+                                    'game_complete': True,
+                                    'words_mastered': bucket_progress.words_mastered,
+                                    'final_bucket': word.difficulty_bucket,
+                                    'session_correct': session.words_correct,
+                                    'session_attempted': session.words_attempted,
+                                    'total_correct': progress.total_words_correct,
+                                    'message': f'Congratulations! You have mastered all available buckets up to {word.difficulty_bucket}-letter words!',
+                                    'leaderboard': leaderboard_data
+                                })
+                            
+                            # Move to next bucket
+                            progress.current_bucket = next_bucket
+                            progress.save()
+                            
+                            # Clean up unmastered words from the old bucket (they won't be used anymore)
+                            WordQueue.objects.filter(
+                                student=request.user,
+                                word__difficulty_bucket=word.difficulty_bucket,
+                                is_mastered=False
+                            ).delete()
+                            
+                            leaderboard_data = None
+                            if request.user.classroom:
+                                raw_leaderboard = get_classroom_leaderboard(request.user.classroom, request.user)
+                                leaderboard_data = serialize_leaderboard_for_json(raw_leaderboard)
+                            
+                            return JsonResponse({
+                                'correct': True,
+                                'bucket_complete': True,
+                                'words_mastered': bucket_progress.words_mastered,
+                                'new_bucket': progress.current_bucket,
+                                'session_correct': session.words_correct,
+                                'session_attempted': session.words_attempted,
+                                'total_correct': progress.total_words_correct,
+                                'leaderboard': leaderboard_data
+                            })
+                        else:
+                            # DEBUG
+                            print(f'DEBUG: NOT ADVANCING - Still have {words_in_progress_count} words in progress')
+                    
+                    bucket_progress.save()
+            # else: word was already mastered, don't do anything special
         else:
             # Recycle the word - move it back into the queue
             queue_word.times_failed += 1
             
-            # Get config for recycling distance
-            config = GameConfiguration.objects.first() or GameConfiguration.objects.create(
-                teacher=User.objects.filter(role='teacher').first() or request.user
-            )
+            # Get config for recycling distance (use student's teacher's config)
+            teacher = request.user.get_teacher()
+            if teacher:
+                config = GameConfiguration.objects.filter(teacher=teacher).first()
+            else:
+                config = GameConfiguration.objects.first()
             
-            # Calculate new position (within next recycling_distance words)
-            current_max_position = WordQueue.objects.filter(
+            if not config:
+                config = GameConfiguration.objects.create(
+                    teacher=User.objects.filter(role='teacher').first() or request.user
+                )
+            
+            # Calculate new position (AT THE FRONT, within recycling_distance)
+            # Get the minimum position currently in the queue
+            current_min_position = WordQueue.objects.filter(
                 student=request.user,
                 is_mastered=False
-            ).aggregate(max_pos=Count('id'))['max_pos'] or 0
+            ).aggregate(min_pos=Min('position'))['min_pos'] or 0
             
-            # Place it randomly within the recycling distance
-            new_position = current_max_position + random.randint(1, min(config.recycling_distance, 50))
+            # Place it at the front, randomly within 1 to recycling_distance positions from the start
+            # This puts failed words BEFORE most unattempted words
+            new_position = current_min_position + random.randint(1, min(config.recycling_distance, 50))
             queue_word.position = new_position
             queue_word.save()
     
@@ -418,20 +676,103 @@ def submit_answer(request):
         bucket=progress.current_bucket
     )
     
+    # Get config for words_to_complete
+    teacher = request.user.get_teacher()
+    if teacher:
+        config = GameConfiguration.objects.filter(teacher=teacher).first()
+    else:
+        config = GameConfiguration.objects.first()
+    
+    words_to_complete = config.words_to_complete_bucket if config else 200
+    
+    # Count correct attempts for this word to show progress
+    correct_attempts_for_word = WordAttempt.objects.filter(
+        student=request.user,
+        word=word,
+        is_correct=True
+    ).count()
+    
+    # Determine mastery requirement based on whether word has been failed
+    queue_word_for_response = WordQueue.objects.filter(
+        student=request.user,
+        word=word
+    ).first()
+    
+    if queue_word_for_response and queue_word_for_response.times_failed > 0:
+        # Word has been misspelled - needs 3 correct attempts
+        mastery_required = 3
+    else:
+        # Word never failed - needs only 1 correct attempt
+        mastery_required = 1
+    
     # Get updated leaderboard data
     leaderboard_data = None
     if request.user.classroom:
         raw_leaderboard = get_classroom_leaderboard(request.user.classroom, request.user)
         leaderboard_data = serialize_leaderboard_for_json(raw_leaderboard)
     
+    # Calculate words in progress (not yet mastered but in queue)
+    words_in_progress = WordQueue.objects.filter(
+        student=request.user,
+        word__difficulty_bucket=progress.current_bucket,
+        is_mastered=False
+    )
+    
+    # Count how many words need 1, 2, or 3 more correct attempts
+    # ONLY count words that have been attempted at least once
+    needs_1_more = 0
+    needs_2_more = 0
+    needs_3_more = 0
+    
+    for queue_item in words_in_progress:
+        # Check if word has been attempted at all
+        has_been_attempted = WordAttempt.objects.filter(
+            student=request.user,
+            word=queue_item.word
+        ).exists()
+        
+        if not has_been_attempted:
+            # Skip words that haven't been seen yet
+            continue
+            
+        if queue_item.times_failed > 0:
+            # Word has been failed - needs 3 correct total
+            correct_count = WordAttempt.objects.filter(
+                student=request.user,
+                word=queue_item.word,
+                is_correct=True
+            ).count()
+            remaining = 3 - correct_count
+            if remaining == 1:
+                needs_1_more += 1
+            elif remaining == 2:
+                needs_2_more += 1
+            elif remaining >= 3:
+                needs_3_more += 1
+        else:
+            # Word never failed but has been attempted - needs 1 correct
+            has_correct = WordAttempt.objects.filter(
+                student=request.user,
+                word=queue_item.word,
+                is_correct=True
+            ).exists()
+            if not has_correct:
+                needs_1_more += 1
+    
     response_data = {
         'correct': is_correct,
         'correct_spelling': word.text,
         'bucket_complete': False,
         'words_mastered': bucket_progress.words_mastered,
+        'words_to_complete': words_to_complete,
         'session_correct': session.words_correct,
         'session_attempted': session.words_attempted,
         'total_correct': progress.total_words_correct,
+        'word_correct_count': correct_attempts_for_word,
+        'word_mastery_required': mastery_required,
+        'words_need_1': needs_1_more,
+        'words_need_2': needs_2_more,
+        'words_need_3': needs_3_more,
         'leaderboard': leaderboard_data
     }
     
@@ -596,12 +937,12 @@ def teacher_config(request):
             config.default_starting_bucket = new_default_bucket
             config.save()
             
-            # IMMEDIATELY update all students who don't have custom settings
+            # ONLY update students who were on the old default bucket
             if old_default_bucket != new_default_bucket:
-                # Get all students of this teacher without custom starting bucket
+                # Get students of this teacher who are currently on the old default bucket
                 students_to_update = StudentProgress.objects.filter(
                     student__teacher=request.user,
-                    custom_starting_bucket__isnull=True
+                    current_bucket=old_default_bucket
                 )
                 
                 updated_count = 0
@@ -627,10 +968,10 @@ def teacher_config(request):
                 if updated_count > 0:
                     messages.success(
                         request, 
-                        f'✅ Configuration updated! {updated_count} student(s) immediately moved to {new_default_bucket}-letter words!'
+                        f'✅ Configuration updated! {updated_count} student(s) on {old_default_bucket}-letter words moved to {new_default_bucket}-letter words!'
                     )
                 else:
-                    messages.success(request, 'Configuration updated successfully!')
+                    messages.success(request, 'Configuration updated! No students were on the old default bucket.')
             else:
                 messages.success(request, 'Configuration updated successfully!')
                 
@@ -642,19 +983,71 @@ def teacher_config(request):
     # Get list of available buckets (3-20)
     available_buckets = list(range(3, 21))
     
-    # Get count of students using default (no custom override)
-    students_using_default = StudentProgress.objects.filter(
+    # Get count of students currently on the default bucket
+    students_on_default_count = StudentProgress.objects.filter(
         student__teacher=request.user,
-        custom_starting_bucket__isnull=True
+        current_bucket=config.default_starting_bucket
     ).count()
     
     context = {
         'config': config,
         'available_buckets': available_buckets,
-        'students_using_default': students_using_default,
+        'students_on_default': students_on_default_count,
     }
     
     return render(request, 'game/teacher_config.html', context)
+
+
+@login_required
+def bulk_assign_students(request):
+    """Assign ALL students in the classroom to a specific bucket"""
+    if not request.user.is_teacher():
+        return redirect('student_game')
+    
+    if request.method == 'POST':
+        try:
+            bulk_bucket = int(request.POST.get('bulk_bucket'))
+            
+            if 3 <= bulk_bucket <= 20:
+                # Get ALL students of this teacher
+                students_to_update = StudentProgress.objects.filter(
+                    student__teacher=request.user
+                )
+                
+                updated_count = 0
+                for progress in students_to_update:
+                    # Update their current bucket to the specified value
+                    progress.current_bucket = bulk_bucket
+                    progress.save()
+                    
+                    # Clear their word queue for fresh words
+                    WordQueue.objects.filter(student=progress.student).delete()
+                    
+                    # End any active sessions
+                    GameSession.objects.filter(student=progress.student, is_active=True).update(is_active=False)
+                    
+                    # Create/update bucket progress
+                    BucketProgress.objects.get_or_create(
+                        student=progress.student,
+                        bucket=bulk_bucket
+                    )
+                    
+                    updated_count += 1
+                
+                if updated_count > 0:
+                    messages.success(
+                        request,
+                        f'✅ All {updated_count} student(s) have been assigned to {bulk_bucket}-letter words!'
+                    )
+                else:
+                    messages.info(request, 'No students found to update.')
+            else:
+                messages.error(request, 'Please select a valid bucket (3-20 letters)')
+                
+        except (ValueError, TypeError):
+            messages.error(request, 'Please select a valid bucket')
+    
+    return redirect('teacher_config')
 
 
 @login_required
@@ -675,7 +1068,7 @@ def update_student_starting_bucket(request, student_id):
         return redirect('teacher_dashboard')
     
     if request.method == 'POST':
-        custom_bucket = request.POST.get('custom_starting_bucket')
+        bucket_value_str = request.POST.get('bucket_value')
         
         # Get or create progress
         progress, created = StudentProgress.objects.get_or_create(
@@ -683,14 +1076,11 @@ def update_student_starting_bucket(request, student_id):
         )
         
         try:
-            if custom_bucket:
-                bucket_value = int(custom_bucket)
+            if bucket_value_str:
+                bucket_value = int(bucket_value_str)
                 if 3 <= bucket_value <= 20:
                     # Store the old bucket for comparison
                     old_bucket = progress.current_bucket
-                    
-                    # Set custom starting bucket
-                    progress.custom_starting_bucket = bucket_value
                     
                     # IMMEDIATELY change the current bucket to the new value
                     progress.current_bucket = bucket_value
@@ -715,11 +1105,10 @@ def update_student_starting_bucket(request, student_id):
                 else:
                     messages.error(request, 'Starting bucket must be between 3 and 20')
             else:
-                # Clear custom setting (use teacher default)
+                # Reset to teacher's default
                 old_bucket = progress.current_bucket
-                progress.custom_starting_bucket = None
                 
-                # Immediately update to teacher's default
+                # Update to teacher's default
                 new_bucket = progress.get_starting_bucket()
                 progress.current_bucket = new_bucket
                 progress.save()
@@ -737,9 +1126,9 @@ def update_student_starting_bucket(request, student_id):
                 )
                 
                 if old_bucket != new_bucket:
-                    messages.success(request, f'✅ Custom setting cleared. {student.username} moved to {new_bucket}-letter words (teacher default) immediately!')
+                    messages.success(request, f'✅ {student.username} moved to {new_bucket}-letter words (teacher default) immediately!')
                 else:
-                    messages.success(request, f'Custom starting bucket cleared for {student.username}')
+                    messages.success(request, f'Student bucket reset to teacher default: {new_bucket}')
         except ValueError:
             messages.error(request, 'Please enter a valid number')
     

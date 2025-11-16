@@ -26,10 +26,10 @@
             </select>
             <p class="help-text">
                 <strong>⚡ Changes take effect immediately!</strong><br>
-                {% if students_using_default > 0 %}
-                    Currently <strong>{{ students_using_default }} student(s)</strong> are using this default setting and will be moved to the new difficulty instantly.
+                {% if students_on_default > 0 %}
+                    Currently <strong>{{ students_on_default }} student(s)</strong> are on {{ config.default_starting_bucket }}-letter words and will be moved to the new default if you change it.
                 {% else %}
-                    All your students have custom settings, so changing this will only affect new students.
+                    No students are currently on the default {{ config.default_starting_bucket }}-letter bucket.
                 {% endif %}
             </p>
         </div>
@@ -62,6 +62,33 @@
         
         <button type="submit" class="btn btn-primary">Save Configuration</button>
     </form>
+    
+    <div class="bulk-assign-section">
+        <h3>🎯 Bulk Student Assignment</h3>
+        <p>Assign <strong>ALL</strong> students in your classroom to a specific difficulty level, regardless of their current bucket.</p>
+        
+        <form method="post" action="{% url 'bulk_assign_students' %}" class="bulk-assign-form">
+            {% csrf_token %}
+            
+            <div class="form-inline">
+                <label for="bulk_bucket">Assign all students to:</label>
+                <select id="bulk_bucket" name="bulk_bucket" required>
+                    {% for bucket in available_buckets %}
+                        <option value="{{ bucket }}">
+                            {{ bucket }} letters
+                        </option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-warning" onclick="return confirm('Are you sure you want to move ALL students to this difficulty level? This will affect every student in your classroom.');">
+                    📢 Assign All Students
+                </button>
+            </div>
+            
+            <p class="help-text warning">
+                ⚠️ <strong>Warning:</strong> This will immediately change the difficulty level for <strong>every student</strong> in your classroom, clearing their word queues and ending active sessions. Use this when you want to reset everyone to the same starting point.
+            </p>
+        </form>
+    </div>
     
     <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary">← Back to Dashboard</a>
 </div>
@@ -139,6 +166,65 @@
     
     .btn-secondary:hover {
         background: #555;
+    }
+    
+    .bulk-assign-section {
+        background: #fff3cd;
+        border: 2px solid #ffc107;
+        padding: 2rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+    }
+    
+    .bulk-assign-section h3 {
+        margin-top: 0;
+        color: #856404;
+    }
+    
+    .bulk-assign-form {
+        margin-top: 1rem;
+    }
+    
+    .form-inline {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .form-inline label {
+        font-weight: bold;
+        color: #333;
+        white-space: nowrap;
+    }
+    
+    .form-inline select {
+        padding: 0.5rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+    }
+    
+    .btn-warning {
+        background: #ff9800;
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+        white-space: nowrap;
+    }
+    
+    .btn-warning:hover {
+        background: #e68900;
+    }
+    
+    .help-text.warning {
+        background: white;
+        padding: 1rem;
+        border-radius: 4px;
+        border-left: 4px solid #ff9800;
     }
 </style>
 {% endblock %}

@@ -26,11 +26,11 @@
         <form method="post" action="{% url 'update_student_starting_bucket' student.id %}" class="inline-form">
             {% csrf_token %}
             <div class="form-inline-group">
-                <label for="custom_starting_bucket">Set Word Difficulty (Letters):</label>
-                <select id="custom_starting_bucket" name="custom_starting_bucket">
+                <label for="bucket_value">Set Word Difficulty (Letters):</label>
+                <select id="bucket_value" name="bucket_value">
                     <option value="">Use Teacher Default ({{ config.default_starting_bucket }})</option>
                     {% for bucket in available_buckets %}
-                        <option value="{{ bucket }}" {% if progress.custom_starting_bucket == bucket %}selected{% endif %}>
+                        <option value="{{ bucket }}" {% if progress.current_bucket == bucket %}selected{% endif %}>
                             {{ bucket }} letters
                         </option>
                     {% endfor %}
@@ -39,11 +39,6 @@
             </div>
             <p class="help-text">
                 <strong>Current difficulty:</strong> {{ progress.current_bucket }}-letter words
-                {% if progress.custom_starting_bucket %}
-                    (custom override)
-                {% else %}
-                    (teacher default)
-                {% endif %}
                 <br>
                 <em>⚡ Changes take effect immediately - the student will get new words at the selected difficulty!</em>
             </p>
