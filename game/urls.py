@@ -21,4 +21,17 @@ urlpatterns = [
     path('teacher/classrooms/<int:classroom_id>/', views.classroom_detail, name='classroom_detail'),
     path('teacher/classrooms/<int:classroom_id>/delete/', views.classroom_delete, name='classroom_delete'),
     path('teacher/classrooms/<int:classroom_id>/regenerate-code/', views.classroom_regenerate_code, name='classroom_regenerate_code'),
+    path('teacher/classrooms/<int:classroom_id>/assign-ladder/', views.classroom_assign_ladder, name='classroom_assign_ladder'),
+    
+    # Bucket ladder management
+    path('teacher/ladders/', views.ladder_list, name='ladder_list'),
+    path('teacher/ladders/create/', views.ladder_create, name='ladder_create'),
+    path('teacher/ladders/<int:ladder_id>/', views.ladder_detail, name='ladder_detail'),
+    path('teacher/ladders/<int:ladder_id>/delete/', views.ladder_delete, name='ladder_delete'),
+    path('teacher/ladders/<int:ladder_id>/bucket/create/', views.bucket_create, name='bucket_create'),
+    path('teacher/buckets/<int:bucket_id>/update/', views.bucket_update, name='bucket_update'),
+    path('teacher/buckets/<int:bucket_id>/delete/', views.bucket_delete, name='bucket_delete'),
+    path('teacher/buckets/<int:bucket_id>/add-words/', views.bucket_add_words, name='bucket_add_words'),
+    path('teacher/buckets/<int:bucket_id>/words/', views.bucket_get_words, name='bucket_get_words'),
+    path('teacher/words/<int:word_id>/delete/', views.bucket_remove_word, name='bucket_remove_word'),
 ]

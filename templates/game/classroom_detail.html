@@ -51,6 +51,63 @@
         </div>
     </div>
     
+    <div class="settings-section">
+        <div class="settings-card">
+            <h3>⚙️ Classroom Settings</h3>
+            
+            <!-- Bucket Ladder Assignment -->
+            <div class="setting-group">
+                <h4>Word Progression System</h4>
+                <form method="post" action="{% url 'classroom_assign_ladder' classroom.id %}">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="ladder_id">Bucket Ladder:</label>
+                        <select id="ladder_id" name="ladder_id" class="form-select" onchange="updateLadderInfo(this)">
+                            <option value="default" {% if not classroom.bucket_ladder %}selected{% endif %}>
+                                Default System Buckets (Word Length)
+                            </option>
+                            {% for ladder in available_ladders %}
+                            <option value="{{ ladder.id }}" 
+                                    data-bucket-count="{{ ladder.custom_buckets.count }}"
+                                    {% if classroom.bucket_ladder and classroom.bucket_ladder.id == ladder.id %}selected{% endif %}>
+                                {{ ladder.name }} ({{ ladder.custom_buckets.count }} buckets)
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <p class="help-text" id="ladder-help-text">
+                            {% if classroom.bucket_ladder %}
+                            Using custom ladder: <strong>{{ classroom.bucket_ladder.name }}</strong>
+                            {% else %}
+                            Using default word-length based buckets
+                            {% endif %}
+                        </p>
+                    </div>
+                    
+                    <div id="default-bucket-setting" {% if classroom.bucket_ladder %}style="display:none;"{% endif %}>
+                        <div class="form-group">
+                            <label for="default_starting_bucket">Default Starting Bucket (for new students):</label>
+                            <select id="default_starting_bucket" name="default_starting_bucket" class="form-select">
+                                {% for bucket in available_buckets %}
+                                <option value="{{ bucket }}" {% if classroom.default_starting_bucket == bucket %}selected{% endif %}>
+                                    {{ bucket }}-letter words
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <p class="help-text">New students will start at this bucket level when using default system</p>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" onclick="return confirm('Change bucket ladder? All students will be moved to the new starting bucket and their queues will be reset.')">
+                            💾 Save Settings
+                        </button>
+                        <a href="{% url 'ladder_list' %}" class="btn btn-secondary">🪜 Manage Ladders</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
     <div class="students-section">
         <h3>👥 Students ({{ student_stats|length }})</h3>
         
@@ -116,7 +173,77 @@
     }
     
     .join-section {
+        margin-bottom: 2rem;
+    }
+    
+    .settings-section {
         margin-bottom: 3rem;
+    }
+    
+    .settings-card {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .settings-card h3 {
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        color: #333;
+    }
+    
+    .setting-group {
+        margin-bottom: 2rem;
+    }
+    
+    .setting-group h4 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        color: #555;
+        font-size: 1.1rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-group label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+        color: #555;
+    }
+    
+    .form-select {
+        width: 100%;
+        padding: 0.75rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1rem;
+        background: white;
+    }
+    
+    .form-select:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+    
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e0e0e0;
+    }
+    
+    .btn-primary {
+        background: #667eea;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #5568d3;
     }
     
     .join-card {
@@ -342,6 +469,22 @@ function copyLink() {
     navigator.clipboard.writeText(input.value).then(() => {
         alert('Join link copied to clipboard!');
     });
+}
+
+function updateLadderInfo(select) {
+    const defaultBucketSetting = document.getElementById('default-bucket-setting');
+    const helpText = document.getElementById('ladder-help-text');
+    
+    if (select.value === 'default') {
+        defaultBucketSetting.style.display = 'block';
+        helpText.textContent = 'Using default word-length based buckets';
+    } else {
+        defaultBucketSetting.style.display = 'none';
+        const selectedOption = select.options[select.selectedIndex];
+        const ladderName = selectedOption.text.split(' (')[0];
+        const bucketCount = selectedOption.getAttribute('data-bucket-count');
+        helpText.innerHTML = `Using custom ladder: <strong>${ladderName}</strong> (${bucketCount} buckets)`;
+    }
 }
 </script>
 {% endblock %}
