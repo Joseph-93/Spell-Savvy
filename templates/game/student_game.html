@@ -703,7 +703,7 @@
     <div class="stats-bar">
         <div class="stat-card">
             <div class="stat-label">Current Bucket</div>
-            <div class="stat-value" id="current-bucket">{{ progress.current_bucket }}</div>
+            <div class="stat-value" id="current-bucket">{{ progress.get_current_bucket_display }}</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Session Score</div>
@@ -785,7 +785,7 @@
                 <div class="bucket-info">
                     <div class="current-bucket-display">
                         <span class="bucket-label">Current Bucket</span>
-                        <span class="bucket-number">{{ progress.current_bucket }}</span>
+                        <span class="bucket-number">{{ progress.get_current_bucket_display }}</span>
                     </div>
                 </div>
                 
@@ -850,9 +850,11 @@
                     </div>
                 </div>
                 
+                {% if not progress.uses_custom_ladder %}
                 <div class="next-bucket-info">
                     <small>Next: Bucket {{ progress.current_bucket|add:"1" }} ({{ progress.current_bucket|add:"1" }}-letter words)</small>
                 </div>
+                {% endif %}
             </div>
 
             <!-- Leaderboard Sidebar -->

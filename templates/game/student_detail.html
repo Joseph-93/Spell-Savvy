@@ -9,7 +9,12 @@
     <div class="stats-grid">
         <div class="stat-box">
             <h3>Current Bucket</h3>
-            <p class="big-stat">{{ progress.current_bucket|default:"N/A" }}</p>
+            <p class="big-stat">{{ progress.get_current_bucket_display|default:"N/A" }}</p>
+            {% if progress.uses_custom_ladder %}
+            <p style="font-size: 0.9rem; color: #666; margin-top: 0.5rem;">
+                Ladder: {{ progress.current_custom_bucket.ladder.name }}
+            </p>
+            {% endif %}
         </div>
         <div class="stat-box">
             <h3>Total Words Correct</h3>
@@ -23,6 +28,31 @@
     
     <div class="config-section">
         <h3>⚙️ Student Settings</h3>
+        {% if progress.uses_custom_ladder %}
+        <div class="info-box">
+            <p><strong>📚 Using Custom Ladder:</strong> {{ progress.custom_bucket.ladder.name }}</p>
+        </div>
+        <form method="post" action="{% url 'update_student_starting_bucket' student.id %}" class="inline-form">
+            {% csrf_token %}
+            <div class="form-inline-group">
+                <label for="custom_bucket_id">Set Current Bucket:</label>
+                <select id="custom_bucket_id" name="custom_bucket_id">
+                    <option value="">Use Default Starting Bucket</option>
+                    {% for bucket in custom_ladder_buckets %}
+                        <option value="{{ bucket.id }}" {% if progress.custom_bucket.id == bucket.id %}selected{% endif %}>
+                            {{ bucket.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-small">Update Now</button>
+            </div>
+            <p class="help-text">
+                <strong>Current bucket:</strong> {{ progress.get_current_bucket_display }}
+                <br>
+                <em>⚡ Changes take effect immediately - the student will get new words from the selected bucket!</em>
+            </p>
+        </form>
+        {% else %}
         <form method="post" action="{% url 'update_student_starting_bucket' student.id %}" class="inline-form">
             {% csrf_token %}
             <div class="form-inline-group">
@@ -43,6 +73,7 @@
                 <em>⚡ Changes take effect immediately - the student will get new words at the selected difficulty!</em>
             </p>
         </form>
+        {% endif %}
     </div>
     
     <h3>📚 Bucket Progress</h3>
@@ -272,6 +303,17 @@
         font-size: 0.9rem;
         color: #666;
         margin-top: 0.5rem;
+    }
+    
+    .info-box {
+        background: #e3f2fd;
+        padding: 1rem;
+        border-radius: 4px;
+        border-left: 4px solid #2196F3;
+    }
+    
+    .info-box p {
+        margin: 0.5rem 0;
     }
 </style>
 {% endblock %}

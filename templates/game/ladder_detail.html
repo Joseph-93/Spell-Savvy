@@ -1,0 +1,674 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ ladder.name }} - Spelling Game{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header-section">
+        <div>
+            <h2>🪜 {{ ladder.name }}</h2>
+            {% if ladder.description %}
+            <p class="ladder-description">{{ ladder.description }}</p>
+            {% endif %}
+        </div>
+        <div class="header-actions">
+            <button onclick="showAddBucketModal()" class="btn btn-primary">+ Add Bucket</button>
+            <button onclick="showDeleteLadderModal()" class="btn btn-danger">Delete Ladder</button>
+        </div>
+    </div>
+    
+    {% if classrooms_using %}
+    <div class="usage-banner">
+        <strong>📚 In Use:</strong> This ladder is assigned to {{ classrooms_using.count }} classroom{{ classrooms_using.count|pluralize }}:
+        {% for classroom in classrooms_using %}
+            <span class="classroom-tag">{{ classroom.name }}</span>{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    {% if buckets %}
+    <div class="buckets-section">
+        <h3>Buckets ({{ buckets.count }})</h3>
+        <div class="buckets-list">
+            {% for bucket in buckets %}
+            <div class="bucket-item">
+                <div class="bucket-info">
+                    <div class="bucket-position">{{ bucket.position }}</div>
+                    <div class="bucket-details">
+                        <h4>{{ bucket.name }}</h4>
+                        {% if bucket.description %}
+                        <p class="bucket-desc">{{ bucket.description }}</p>
+                        {% endif %}
+                        <div class="bucket-stats">
+                            <span class="stat-badge">{{ bucket.word_count }} word{{ bucket.word_count|pluralize }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bucket-actions">
+                    <button onclick="showAddWordsModal({{ bucket.id }}, '{{ bucket.name }}')" class="btn btn-sm btn-secondary">
+                        📝 Add Words
+                    </button>
+                    <button onclick="showViewWordsModal({{ bucket.id }}, '{{ bucket.name }}')" class="btn btn-sm btn-secondary">
+                        👁️ View Words
+                    </button>
+                    <button onclick="showEditBucketModal({{ bucket.id }}, '{{ bucket.name }}', '{{ bucket.description }}', {{ bucket.position }})" class="btn btn-sm btn-secondary">
+                        ✏️ Edit
+                    </button>
+                    <form method="post" action="{% url 'bucket_delete' bucket.id %}" style="display:inline;" 
+                          onsubmit="return confirm('Delete bucket \'{{ bucket.name }}\'? This cannot be undone!');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-danger">🗑️</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">📚</div>
+        <h3>No buckets yet</h3>
+        <p>Add your first bucket to start building this ladder!</p>
+        <button onclick="showAddBucketModal()" class="btn btn-primary">Add First Bucket</button>
+    </div>
+    {% endif %}
+    
+    <div class="back-link">
+        <a href="{% url 'ladder_list' %}">← Back to Ladders</a>
+    </div>
+</div>
+
+<!-- Add Bucket Modal -->
+<div id="add-bucket-modal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Add New Bucket</h3>
+        <form method="post" action="{% url 'bucket_create' ladder.id %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="bucket_name">Bucket Name:</label>
+                <input 
+                    type="text" 
+                    id="bucket_name" 
+                    name="bucket_name" 
+                    placeholder="e.g., Easy Words, Grade 3, Animals"
+                    required
+                >
+            </div>
+            <div class="form-group">
+                <label for="bucket_description">Description (optional):</label>
+                <textarea 
+                    id="bucket_description" 
+                    name="bucket_description" 
+                    rows="2"
+                    placeholder="Describe this bucket..."
+                ></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" onclick="hideAddBucketModal()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Bucket</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Bucket Modal -->
+<div id="edit-bucket-modal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Edit Bucket</h3>
+        <form method="post" id="edit-bucket-form">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="edit_bucket_name">Bucket Name:</label>
+                <input 
+                    type="text" 
+                    id="edit_bucket_name" 
+                    name="bucket_name" 
+                    required
+                >
+            </div>
+            <div class="form-group">
+                <label for="edit_bucket_description">Description:</label>
+                <textarea 
+                    id="edit_bucket_description" 
+                    name="bucket_description" 
+                    rows="2"
+                ></textarea>
+            </div>
+            <div class="form-group">
+                <label for="edit_position">Position:</label>
+                <input 
+                    type="number" 
+                    id="edit_position" 
+                    name="position" 
+                    min="1"
+                    required
+                >
+                <p class="help-text">Lower numbers appear first in the progression</p>
+            </div>
+            <div class="modal-actions">
+                <button type="button" onclick="hideEditBucketModal()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Words Modal -->
+<div id="add-words-modal" class="modal-overlay">
+    <div class="modal-content large">
+        <h3>Add Words to <span id="add-words-bucket-name"></span></h3>
+        <form method="post" id="add-words-form">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="words">Words:</label>
+                <textarea 
+                    id="words" 
+                    name="words" 
+                    rows="10"
+                    placeholder="Enter words separated by spaces, commas, or new lines...&#10;Examples:&#10;cat dog bird&#10;elephant, giraffe, zebra&#10;quick-thinking, well-known"
+                    required
+                ></textarea>
+                <p class="help-text">
+                    <strong>Tip:</strong> Paste words in any format! We'll accept letters and hyphens only. 
+                    Phrases are not supported - only single words and hyphenated words.
+                </p>
+            </div>
+            <div class="modal-actions">
+                <button type="button" onclick="hideAddWordsModal()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Words</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- View Words Modal -->
+<div id="view-words-modal" class="modal-overlay">
+    <div class="modal-content large">
+        <h3>Words in <span id="view-words-bucket-name"></span></h3>
+        <div id="words-list-loading">Loading words...</div>
+        <div id="words-list-content" style="display:none;">
+            <div id="words-list" class="words-display"></div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" onclick="hideViewWordsModal()" class="btn btn-secondary">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Ladder Confirmation Modal -->
+<div id="delete-ladder-modal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>⚠️ Delete Ladder?</h3>
+        <p>Are you sure you want to delete this entire bucket ladder? This action cannot be undone!</p>
+        {% if classrooms_using %}
+        <div class="warning-box">
+            <strong>Warning:</strong> This ladder is currently assigned to {{ classrooms_using.count }} classroom{{ classrooms_using.count|pluralize }}. 
+            You must unassign it from all classrooms before deleting.
+        </div>
+        {% else %}
+        <form method="post" action="{% url 'ladder_delete' ladder.id %}">
+            {% csrf_token %}
+            <div class="modal-actions">
+                <button type="button" onclick="hideDeleteLadderModal()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-danger">Delete Ladder</button>
+            </div>
+        </form>
+        {% endif %}
+        {% if classrooms_using %}
+        <div class="modal-actions">
+            <button type="button" onclick="hideDeleteLadderModal()" class="btn btn-secondary">Close</button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .container {
+        max-width: 1200px;
+        margin: 2rem auto;
+        padding: 0 2rem;
+    }
+    
+    .header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 2rem;
+    }
+    
+    .header-section h2 {
+        margin: 0 0 0.5rem 0;
+        color: #333;
+    }
+    
+    .ladder-description {
+        color: #666;
+        margin: 0;
+    }
+    
+    .header-actions {
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .usage-banner {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+        color: #856404;
+    }
+    
+    .classroom-tag {
+        background: #856404;
+        color: white;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+    
+    .buckets-section h3 {
+        color: #333;
+        margin-bottom: 1rem;
+    }
+    
+    .buckets-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .bucket-item {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        padding: 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: transform 0.2s;
+    }
+    
+    .bucket-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .bucket-info {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        flex: 1;
+    }
+    
+    .bucket-position {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+        flex-shrink: 0;
+    }
+    
+    .bucket-details {
+        flex: 1;
+    }
+    
+    .bucket-details h4 {
+        margin: 0 0 0.25rem 0;
+        color: #333;
+    }
+    
+    .bucket-desc {
+        margin: 0 0 0.5rem 0;
+        color: #666;
+        font-size: 0.9rem;
+    }
+    
+    .bucket-stats {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .stat-badge {
+        background: #e3f2fd;
+        color: #1976d2;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    
+    .bucket-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+    
+    .btn-sm {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: #f8f9fa;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+    }
+    
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+    
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        overflow-y: auto;
+    }
+    
+    .modal-overlay.show {
+        display: flex;
+    }
+    
+    .modal-content {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        margin: 2rem auto;
+    }
+    
+    .modal-content.large {
+        max-width: 700px;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #333;
+        font-weight: 500;
+    }
+    
+    .form-group input,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-family: inherit;
+    }
+    
+    .form-group input:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+    
+    .words-display {
+        max-height: 400px;
+        overflow-y: auto;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    .words-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 0.75rem;
+    }
+    
+    .word-item {
+        background: white;
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        border: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.2s;
+    }
+    
+    .word-item:hover {
+        border-color: #667eea;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        transform: translateY(-1px);
+    }
+    
+    .word-text {
+        font-weight: 600;
+        color: #333;
+        font-size: 1rem;
+    }
+    
+    .word-length {
+        font-size: 0.85rem;
+        color: #666;
+        background: #f0f0f0;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+    }
+    
+    .word-tag {
+        background: white;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .word-delete {
+        cursor: pointer;
+        color: #dc3545;
+        font-weight: bold;
+    }
+    
+    .warning-box {
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        padding: 1rem;
+        border-radius: 6px;
+        margin: 1rem 0;
+        color: #856404;
+    }
+    
+    .modal-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        margin-top: 1.5rem;
+    }
+    
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.2s;
+        text-decoration: none;
+    }
+    
+    .btn-primary {
+        background: #667eea;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #5568d3;
+    }
+    
+    .btn-secondary {
+        background: #f0f0f0;
+        color: #333;
+    }
+    
+    .btn-secondary:hover {
+        background: #e0e0e0;
+    }
+    
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-danger:hover {
+        background: #c82333;
+    }
+    
+    .back-link {
+        margin-top: 2rem;
+    }
+    
+    .back-link a {
+        color: #667eea;
+        text-decoration: none;
+    }
+    
+    .back-link a:hover {
+        text-decoration: underline;
+    }
+    
+    .help-text {
+        font-size: 0.85rem;
+        color: #666;
+        margin-top: 0.5rem;
+    }
+</style>
+
+<script>
+function showAddBucketModal() {
+    document.getElementById('add-bucket-modal').classList.add('show');
+    document.getElementById('bucket_name').focus();
+}
+
+function hideAddBucketModal() {
+    document.getElementById('add-bucket-modal').classList.remove('show');
+}
+
+function showEditBucketModal(bucketId, name, description, position) {
+    const form = document.getElementById('edit-bucket-form');
+    form.action = `/teacher/buckets/${bucketId}/update/`;
+    document.getElementById('edit_bucket_name').value = name;
+    document.getElementById('edit_bucket_description').value = description || '';
+    document.getElementById('edit_position').value = position;
+    document.getElementById('edit-bucket-modal').classList.add('show');
+}
+
+function hideEditBucketModal() {
+    document.getElementById('edit-bucket-modal').classList.remove('show');
+}
+
+function showAddWordsModal(bucketId, bucketName) {
+    const form = document.getElementById('add-words-form');
+    form.action = `/teacher/buckets/${bucketId}/add-words/`;
+    document.getElementById('add-words-bucket-name').textContent = bucketName;
+    document.getElementById('add-words-modal').classList.add('show');
+    document.getElementById('words').focus();
+}
+
+function hideAddWordsModal() {
+    document.getElementById('add-words-modal').classList.remove('show');
+    document.getElementById('words').value = '';
+}
+
+async function showViewWordsModal(bucketId, bucketName) {
+    document.getElementById('view-words-bucket-name').textContent = bucketName;
+    document.getElementById('view-words-modal').classList.add('show');
+    document.getElementById('words-list-loading').style.display = 'block';
+    document.getElementById('words-list-content').style.display = 'none';
+    
+    try {
+        // Fetch words via AJAX
+        const response = await fetch(`/game/teacher/buckets/${bucketId}/words/`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const wordsListDiv = document.getElementById('words-list');
+            
+            if (data.words.length === 0) {
+                wordsListDiv.innerHTML = '<p style="text-align:center; color:#666;">No words in this bucket yet.</p>';
+            } else {
+                // Create a nice display of words
+                let html = '<div class="words-grid">';
+                data.words.forEach(word => {
+                    html += `
+                        <div class="word-item">
+                            <span class="word-text">${word.text}</span>
+                            <span class="word-length">${word.word_length} letters</span>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                html += `<p style="margin-top: 1rem; text-align: center; color: #666;">Total: ${data.word_count} words</p>`;
+                wordsListDiv.innerHTML = html;
+            }
+        } else {
+            document.getElementById('words-list').innerHTML = '<p style="text-align:center; color:#d32f2f;">Error loading words.</p>';
+        }
+    } catch (error) {
+        console.error('Error fetching words:', error);
+        document.getElementById('words-list').innerHTML = '<p style="text-align:center; color:#d32f2f;">Error loading words. Please try again.</p>';
+    } finally {
+        document.getElementById('words-list-loading').style.display = 'none';
+        document.getElementById('words-list-content').style.display = 'block';
+    }
+}
+
+function hideViewWordsModal() {
+    document.getElementById('view-words-modal').classList.remove('show');
+}
+
+function showDeleteLadderModal() {
+    document.getElementById('delete-ladder-modal').classList.add('show');
+}
+
+function hideDeleteLadderModal() {
+    document.getElementById('delete-ladder-modal').classList.remove('show');
+}
+
+// Close modals on outside click
+document.querySelectorAll('.modal-overlay').forEach(modal => {
+    modal.addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.classList.remove('show');
+        }
+    });
+});
+
+// Close modals on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+            modal.classList.remove('show');
+        });
+    }
+});
+</script>
+{% endblock %}
