@@ -103,6 +103,9 @@ def get_words_in_progress_count(progress):
 
 def home(request):
     """Home page - redirect based on user role"""
+    if not request.user.is_authenticated:
+        return redirect('login')
+    
     if request.user.is_teacher():
         return redirect('teacher_dashboard')
     else:
