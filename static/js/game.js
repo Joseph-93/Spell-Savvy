@@ -221,24 +221,161 @@ function getCookie(name) {
 
 const csrftoken = getCookie('csrftoken');
 
-// Fetch word definition from Free Dictionary API
+// ============================================
+// DICTIONARY API CONFIGURATION
+// ============================================
+// TODO: Get your free API key at https://dictionaryapi.com/register/index
+const MERRIAM_WEBSTER_API_KEY = '632630c1-deaa-468f-affd-0be95957a51b';  // <-- REPLACE THIS with your free API key
+
+// Word length threshold: words >= this length will use Merriam-Webster (better coverage)
+// Words < this length will use the free API (saves premium requests)
+const WORD_LENGTH_THRESHOLD = 7;  // <-- CHANGE THIS NUMBER to adjust the threshold
+
+// ============================================
+// Fetch word definition using hybrid API strategy
+// ============================================
 async function getDefinition(word) {
+    const wordLength = word.length;
+    
+    console.log(`\n========================================`);
+    console.log(`📖 Getting definition for: "${word}" (${wordLength} letters)`);
+    console.log(`📊 Threshold: ${WORD_LENGTH_THRESHOLD} letters`);
+    console.log(`🔑 MW API Key configured: ${MERRIAM_WEBSTER_API_KEY !== 'YOUR_API_KEY_HERE'}`);
+    
+    // Strategy: Use Merriam-Webster for longer words (better coverage), free API for shorter words
+    if (wordLength >= WORD_LENGTH_THRESHOLD && MERRIAM_WEBSTER_API_KEY !== 'YOUR_API_KEY_HERE') {
+        console.log(`🎯 Strategy: Try Merriam-Webster first (word length >= ${WORD_LENGTH_THRESHOLD})`);
+        
+        // Try Merriam-Webster first for longer words
+        const mwDefinition = await getMerriamWebsterDefinition(word);
+        if (mwDefinition !== null) {
+            console.log(`✅ SUCCESS: Using Merriam-Webster definition`);
+            console.log(`========================================\n`);
+            return mwDefinition;
+        }
+        
+        // Fallback to free API if Merriam-Webster fails
+        console.log(`⚠️ Merriam-Webster failed, falling back to Free API for: ${word}`);
+        const freeDefinition = await getFreeApiDefinition(word);
+        console.log(`========================================\n`);
+        return freeDefinition;
+    } else {
+        if (wordLength < WORD_LENGTH_THRESHOLD) {
+            console.log(`🎯 Strategy: Use Free API first (word length < ${WORD_LENGTH_THRESHOLD})`);
+        } else {
+            console.log(`🎯 Strategy: Use Free API (no MW API key configured)`);
+        }
+        
+        // Use free API for shorter words (or if no API key configured)
+        const freeDefinition = await getFreeApiDefinition(word);
+        if (freeDefinition !== 'Definition not available.') {
+            console.log(`✅ SUCCESS: Using Free API definition`);
+            console.log(`========================================\n`);
+            return freeDefinition;
+        }
+        
+        // Fallback to Merriam-Webster if free API fails (and key is configured)
+        if (MERRIAM_WEBSTER_API_KEY !== 'YOUR_API_KEY_HERE') {
+            console.log(`⚠️ Free API failed, falling back to Merriam-Webster for: ${word}`);
+            const mwDefinition = await getMerriamWebsterDefinition(word);
+            console.log(`========================================\n`);
+            return mwDefinition || 'Definition not available.';
+        }
+        
+        console.log(`❌ FAILED: No definition available`);
+        console.log(`========================================\n`);
+        return 'Definition not available.';
+    }
+}
+
+// Merriam-Webster Collegiate Dictionary API
+async function getMerriamWebsterDefinition(word) {
     try {
-        const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+        const apiUrl = `https://www.dictionaryapi.com/api/v3/references/collegiate/json/${word}?key=${MERRIAM_WEBSTER_API_KEY}`;
+        console.log(`[MW API] Fetching definition for: "${word}"`);
+        console.log(`[MW API] URL: ${apiUrl.replace(MERRIAM_WEBSTER_API_KEY, 'API_KEY_HIDDEN')}`);
+        
+        const response = await fetch(apiUrl);
+        
+        console.log(`[MW API] Response status: ${response.status} ${response.statusText}`);
+        
         if (!response.ok) {
+            console.error(`[MW API] ❌ HTTP Error: ${response.status} - ${response.statusText}`);
+            if (response.status === 401) {
+                console.error('[MW API] ❌ 401 Unauthorized - Check your API key!');
+            } else if (response.status === 403) {
+                console.error('[MW API] ❌ 403 Forbidden - API key may be invalid or quota exceeded');
+            } else if (response.status === 404) {
+                console.error('[MW API] ❌ 404 Not Found - Word not in dictionary');
+            }
+            return null;
+        }
+        
+        const data = await response.json();
+        console.log(`[MW API] Response data:`, data);
+        
+        // Check if we got actual entries (not just suggestions)
+        if (data && data.length > 0 && typeof data[0] === 'object' && data[0].shortdef) {
+            const entry = data[0];
+            const partOfSpeech = entry.fl || '';  // functional label (part of speech)
+            const definition = entry.shortdef[0];  // first short definition
+            
+            console.log(`[MW API] ✅ Found definition: (${partOfSpeech}) ${definition}`);
+            
+            if (partOfSpeech) {
+                return `(${partOfSpeech}) ${definition}`;
+            }
+            return definition;
+        }
+        
+        // Check if we got suggestions instead (word not found)
+        if (data && data.length > 0 && typeof data[0] === 'string') {
+            console.warn(`[MW API] ⚠️ Word "${word}" not found. Suggestions:`, data);
+            return null;
+        }
+        
+        console.warn(`[MW API] ⚠️ No valid definition found for "${word}"`);
+        return null;  // No valid definition found
+    } catch (error) {
+        console.error(`[MW API] ❌ Exception occurred:`, error);
+        console.error(`[MW API] Error details:`, error.message);
+        return null;
+    }
+}
+
+// Free Dictionary API (dictionaryapi.dev)
+async function getFreeApiDefinition(word) {
+    try {
+        const apiUrl = `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`;
+        console.log(`[Free API] Fetching definition for: "${word}"`);
+        console.log(`[Free API] URL: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl);
+        
+        console.log(`[Free API] Response status: ${response.status} ${response.statusText}`);
+        
+        if (!response.ok) {
+            console.warn(`[Free API] ⚠️ HTTP Error: ${response.status} - ${response.statusText}`);
             return 'Definition not available.';
         }
+        
         const data = await response.json();
+        console.log(`[Free API] Response data:`, data);
         
         if (data && data.length > 0 && data[0].meanings && data[0].meanings.length > 0) {
             const meaning = data[0].meanings[0];
             const definition = meaning.definitions[0].definition;
             const partOfSpeech = meaning.partOfSpeech;
+            
+            console.log(`[Free API] ✅ Found definition: (${partOfSpeech}) ${definition}`);
             return `(${partOfSpeech}) ${definition}`;
         }
+        
+        console.warn(`[Free API] ⚠️ No valid definition found for "${word}"`);
         return 'Definition not available.';
     } catch (error) {
-        console.error('Error fetching definition:', error);
+        console.error(`[Free API] ❌ Exception occurred:`, error);
+        console.error(`[Free API] Error details:`, error.message);
         return 'Definition not available.';
     }
 }
