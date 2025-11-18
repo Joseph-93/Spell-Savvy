@@ -165,6 +165,7 @@ echo -e "${YELLOW}Step 6: Creating Nginx configuration...${NC}"
 cat > /tmp/spelling-game.nginx << EOF
 server {
     listen 80;
+    listen 8000;  # Also listen on 8000 for Cloudflare Tunnel
     server_name eduflows.org www.eduflows.org;
 
     client_max_body_size 10M;
