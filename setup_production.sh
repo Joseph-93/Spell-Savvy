@@ -91,6 +91,27 @@ echo ""
 
 echo -e "${YELLOW}Step 4: Creating Gunicorn systemd service...${NC}"
 
+# Find where gunicorn is installed
+GUNICORN_PATH=$(which gunicorn 2>/dev/null)
+GUNICORN_CMD=""
+
+if [ -n "$GUNICORN_PATH" ]; then
+    # Found gunicorn executable
+    echo -e "${BLUE}Found gunicorn at: ${GUNICORN_PATH}${NC}"
+    GUNICORN_CMD="$GUNICORN_PATH"
+elif python3 -c "import gunicorn" 2>/dev/null; then
+    # Gunicorn module is installed, use python -m gunicorn
+    echo -e "${BLUE}Found gunicorn module, using: python3 -m gunicorn${NC}"
+    GUNICORN_CMD="/usr/bin/python3 -m gunicorn"
+else
+    echo -e "${RED}❌ Gunicorn not found!${NC}"
+    echo "Please install gunicorn:"
+    echo "  sudo apt install gunicorn"
+    echo "  OR"
+    echo "  sudo apt install python3-gunicorn"
+    exit 1
+fi
+
 # Update the service file with actual paths
 cat > /tmp/spelling-game.service << EOF
 [Unit]
@@ -102,7 +123,7 @@ User=${CURRENT_USER}
 Group=www-data
 WorkingDirectory=${PROJECT_DIR}
 Environment="PATH=${PROJECT_DIR}/.venv/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/usr/bin/gunicorn \\
+ExecStart=${GUNICORN_CMD} \\
     --workers 3 \\
     --bind unix:${PROJECT_DIR}/gunicorn.sock \\
     --access-logfile ${PROJECT_DIR}/logs/gunicorn-access.log \\
