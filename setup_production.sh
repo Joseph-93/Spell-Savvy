@@ -42,7 +42,7 @@ if [[ ! -f "manage.py" ]]; then
 fi
 
 # Source the virtual environment
-source .venv/bin/activate
+source venv/bin/activate
 
 # Check if gunicorn is installed
 if ! python3 -c "import gunicorn" 2>/dev/null; then
