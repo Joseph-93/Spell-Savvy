@@ -43,9 +43,17 @@ fi
 
 # Check if gunicorn is installed
 if ! python3 -c "import gunicorn" 2>/dev/null; then
-    echo -e "${YELLOW}⚠️  Gunicorn not installed. Installing now...${NC}"
-    pip3 install gunicorn
-    echo -e "${GREEN}✓ Gunicorn installed${NC}"
+    echo -e "${YELLOW}⚠️  Gunicorn not installed. Installing via apt...${NC}"
+    
+    # Try to install via apt first (Debian/Raspberry Pi OS way)
+    if sudo apt install -y python3-gunicorn 2>/dev/null; then
+        echo -e "${GREEN}✓ Gunicorn installed via apt${NC}"
+    else
+        # Fallback: use pip with --break-system-packages for Pi OS Bookworm
+        echo -e "${YELLOW}Installing via pip (with --break-system-packages)...${NC}"
+        pip3 install --break-system-packages gunicorn
+        echo -e "${GREEN}✓ Gunicorn installed${NC}"
+    fi
     echo ""
 fi
 
@@ -88,7 +96,7 @@ User=${CURRENT_USER}
 Group=www-data
 WorkingDirectory=${PROJECT_DIR}
 Environment="PATH=${PROJECT_DIR}/.venv/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/usr/local/bin/gunicorn \\
+ExecStart=/usr/bin/gunicorn \\
     --workers 3 \\
     --bind unix:${PROJECT_DIR}/gunicorn.sock \\
     --access-logfile ${PROJECT_DIR}/logs/gunicorn-access.log \\
