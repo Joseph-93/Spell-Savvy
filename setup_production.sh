@@ -57,19 +57,22 @@ if ! python3 -c "import gunicorn" 2>/dev/null; then
     echo ""
 fi
 
-# Update settings.py for production if needed
+# Check Django settings
 echo -e "${YELLOW}Step 1: Checking Django settings...${NC}"
 if grep -q "STATIC_ROOT" spelling_game/settings.py; then
     echo -e "${GREEN}✓ STATIC_ROOT already configured${NC}"
 else
-    echo "STATIC_ROOT = BASE_DIR / 'staticfiles'" >> spelling_game/settings.py
-    echo -e "${GREEN}✓ Added STATIC_ROOT to settings.py${NC}"
+    echo -e "${YELLOW}⚠️  STATIC_ROOT not found in settings.py${NC}"
+    echo -e "${YELLOW}   Please add this line to spelling_game/settings.py:${NC}"
+    echo -e "${BLUE}   STATIC_ROOT = BASE_DIR / 'staticfiles'${NC}"
+    echo ""
+    read -p "Press Enter after you've added it, or Ctrl+C to exit..."
 fi
 
 if grep -q "CONN_MAX_AGE" spelling_game/settings.py; then
-    echo -e "${GREEN}✓ Database connection pooling already configured${NC}"
+    echo -e "${GREEN}✓ Database connection pooling configured${NC}"
 else
-    echo -e "${YELLOW}⚠️  Consider adding CONN_MAX_AGE to DATABASES in settings.py for better performance${NC}"
+    echo -e "${YELLOW}⚠️  Consider adding CONN_MAX_AGE to DATABASES for better performance${NC}"
 fi
 echo ""
 
